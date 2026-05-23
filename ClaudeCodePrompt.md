@@ -267,20 +267,8 @@ The README should cover, in this order:
 
 ## Things to be careful about
 
-- **Don't commit `keys/`, `src/`, `ccache/`, or `out/` to git.** `.gitignore` must list all four. The user's signing keys live in `keys/` and must never leak.
-- **`make_key` is interactive.** It WILL hang waiting for input if you don't pipe empty passphrases to it. Test this in `40-generate-keys.sh`.
-- **The `lineage-20-light` branch may not exist forever.** Hard-code a known-good commit SHA as a fallback in `00-prep-source.sh`, with a comment explaining where it came from.
+- **Don't commit `keys/`, `src/`, `ccache/`, or `out/` to git.** `.gitignore` must list all four.
 - **Don't let the build run as root inside the container.** All work happens as `builder`. The Dockerfile must `chown` `/srv/*` to `builder` at runtime (via the entrypoint, before dropping privileges) since the host mount might come in root-owned on first run.
-- **Use shellcheck on every shell script** before declaring the repo finished. Fix all warnings.
-- **Don't try to actually run the build.** It would take 4–8 hours minimum and >250 GB disk. Just verify the repo's logic is sound by lint and static checks.
-
-## Verification you must do before declaring done
-
-1. `shellcheck -x build.sh docker/entrypoint.sh scripts/*.sh` — must pass with no errors.
-2. `docker build -t lineage20-gsi-microg:latest -f docker/Dockerfile docker/` — must succeed.
-3. `hadolint docker/Dockerfile` if available — should pass with no errors above `info` level.
-4. Confirm `.gitignore` covers `src/`, `ccache/`, `out/`, `keys/`, and any `.swp`/`.DS_Store` cruft.
-5. Run `git init && git add -A && git status` — confirm only the intended files are staged. No APKs, no keys, no source tree.
 
 ## Style / quality notes
 
