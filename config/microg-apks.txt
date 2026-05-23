@@ -2,5 +2,5 @@
 # Use SKIP to disable sha256 verification. See README under "Customisation" to pin sha256 values.
 GmsCore.apk     https://github.com/microg/GmsCore/releases/download/v0.3.15.250932/com.google.android.gms-250932030.apk     SKIP
 Companion.apk   https://github.com/microg/GmsCore/releases/download/v0.3.15.250932/com.android.vending-84022630.apk         SKIP
-FDroid.apk      https://f-droid.org/F-Droid.apk                                                                              SKIP
-AuroraStore.apk https://auroraoss.com/downloads/AuroraStore/Stable/AuroraStore-4.8.3.apk                                     SKIP
+FDroid.apk      https://f-droid.org/F-Droid.apk                                                                             SKIP
+AuroraStore.apk https://f-droid.org/repo/com.aurora.store_75.apk                                                            SKIP
