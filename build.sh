@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [--skip-sync] [--clean] [--nproc=N] [--variant=VARIANT]" >&2
             echo ""
             echo "Environment variables (can be set in addition to or instead of flags):"
-            echo "  SKIP_SYNC=1     Skip repo sync (useful when re-running after first sync)"
+            echo "  SKIP_SYNC=1     Local-only repo sync (no network; faster iteration after first sync)"
             echo "  CLEAN=1         Wipe out/ and intermediate/ before starting"
             echo "  NPROC=N         Override parallelism (default: all cores)"
             echo "  VARIANT=64VN    Build variant (default: arm64, vanilla, no su)"

@@ -45,7 +45,7 @@ compile time dramatically.
 
 | Variable / flag | Default | Effect |
 |---|---|---|
-| `SKIP_SYNC=1` / `--skip-sync` | `0` | Skip `repo sync` (useful after first sync) |
+| `SKIP_SYNC=1` / `--skip-sync` | `0` | Local-only `repo sync` (no network; resets working trees to manifest revision but skips fetches — useful for iteration) |
 | `CLEAN=1` / `--clean` | `0` | Wipe `out/` and `intermediate/` before starting |
 | `NPROC=N` / `--nproc=N` | all cores | Parallelism for sync and build |
 | `VARIANT=…` / `--variant=…` | `64VN` | Build flavour (see Customisation below) |

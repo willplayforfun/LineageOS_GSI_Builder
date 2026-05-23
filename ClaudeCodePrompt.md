@@ -88,7 +88,7 @@ Responsibilities:
 4. `docker run --rm -it` the image, mounting all five dirs — `src` → `/srv/src`, `ccache` → `/srv/ccache`, `keys` → `/srv/keys`, `intermediate` → `/srv/intermediate`, `out` → `/srv/out` — then calling `/opt/pipeline/entrypoint.sh`.
 5. Accept these optional environment variables / CLI flags, with sensible defaults:
    - `NPROC` (default: `$(nproc)`)
-   - `SKIP_SYNC=1` to skip `repo sync` (useful for iterating after the first sync)
+   - `SKIP_SYNC=1` to use local-only `repo sync` (`repo sync -l`, no network) — still resets working trees to manifest revision, which is essential for re-runnable patch application. A true "no sync at all" mode would leave projects post-patch and break step 50's idempotency.
    - `CLEAN=1` to wipe the `out/` and `intermediate/` dirs before running
    - `VARIANT` (default: `64VN` — keep it parameterised in case the user later wants `64GN` etc.)
 
@@ -110,7 +110,7 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 - If `/srv/src/.repo` doesn't exist: `repo init -u https://github.com/LineageOS/android.git -b lineage-20.0 --git-lfs` in `/srv/src`.
 - Create `/srv/src/.repo/local_manifests/` if absent.
 - Copy every `*.xml` from `/opt/pipeline/config/local_manifests/` into `/srv/src/.repo/local_manifests/`. This includes the pre-committed `andycgyan-unified.xml` (see below), so `repo sync` handles `lineage_build_unified` and `lineage_patches_unified` as proper repo projects rather than ad-hoc git clones.
-- Unless `SKIP_SYNC=1`: `repo sync -j${NPROC} --force-sync --no-tags --no-clone-bundle --optimized-fetch`.
+- `repo sync` (full fetch + checkout by default; `repo sync -l --force-sync` when `SKIP_SYNC=1` — local-only working-tree checkout, no network).
 - **Two-sync flow** to avoid an external HTTPS fetch for the upstream treble manifest. **First sync** pulls the default LineageOS tree plus the two projects declared by `andycgyan-unified.xml` (`lineage_build_unified`, `lineage_patches_unified`) — without pins applied and without treble-specific projects. After that, the script extracts `upstream-treble.xml` from the synced `lineage_build_unified` repo via `git show ${PIN_LBU}:local_manifests_treble/manifest.xml` (content-addressed by the pinned SHA, not the working-tree HEAD, so it stays deterministic if the pin and the branch tip ever diverge), generates `commit-pins.xml` from `pins.yaml`, and runs a **second `repo sync`** which applies the pins and pulls the treble-specific projects (`device/lineage/gsi`, `vendor/hardware_overlay`, `packages/apps/QcRilAm`, `vendor/gapps`). The second sync is incremental and fast on every run after the first.
 
 `config/local_manifests/andycgyan-unified.xml` must be committed to the pipeline repo with the following contents (or equivalent):

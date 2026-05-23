@@ -29,15 +29,23 @@ SKIP_SYNC="${SKIP_SYNC:-0}"
 
 cd "${SRC_DIR}"
 
-# Shared sync invocation — used for both the first and second sync.
+# Shared sync invocation. With SKIP_SYNC=1 we drop to `repo sync -l` (local-
+# only, no fetch) rather than skipping entirely — this still checks out each
+# project at its manifest revision, which is what undoes the previous run's
+# patch commits and gives apply_patches.sh a clean base to work from. A true
+# skip would leave projects post-patch and break idempotency of step 50.
 run_repo_sync() {
-    repo sync \
-        -j"${NPROC}" \
-        --force-sync \
-        --no-tags \
-        --no-clone-bundle \
-        --optimized-fetch \
-        --retry-fetches=3
+    if [[ "${SKIP_SYNC}" == "1" ]]; then
+        repo sync -l --force-sync
+    else
+        repo sync \
+            -j"${NPROC}" \
+            --force-sync \
+            --no-tags \
+            --no-clone-bundle \
+            --optimized-fetch \
+            --retry-fetches=3
+    fi
 }
 
 # ─── repo init ───────────────────────────────────────────────────────────────
@@ -86,13 +94,13 @@ fi
 # treble-specific projects (upstream-treble.xml not installed) — both happen
 # in the second sync below.
 if [[ "${SKIP_SYNC}" == "1" ]]; then
-    echo "  -> SKIP_SYNC=1: skipping first repo sync."
+    echo "  -> SKIP_SYNC=1: first sync is local-only (working-tree reset, no fetch)."
 else
     echo "  -> First sync (base tree + lineage_*_unified) with ${NPROC} jobs ..."
     echo "     First run: expect several hours and ~250 GB of disk usage."
-    run_repo_sync
-    echo "  -> First sync complete."
 fi
+run_repo_sync
+echo "  -> First sync complete."
 
 # ─── Extract upstream treble manifest at the pinned SHA ──────────────────
 # After the first sync, lineage_build_unified is on disk with its full branch
@@ -146,12 +154,12 @@ echo "  -> Generating zz-commit-pins.xml from config/pins.yaml ..."
 # vendor/hardware_overlay, packages/apps/QcRilAm, vendor/gapps). Incremental
 # for projects already cloned by the first sync — fast.
 if [[ "${SKIP_SYNC}" == "1" ]]; then
-    echo "  -> SKIP_SYNC=1: skipping second repo sync."
+    echo "  -> SKIP_SYNC=1: second sync is local-only (apply pins to working tree, no fetch)."
 else
     echo "  -> Second sync (apply pins, pull treble-specific projects) ..."
-    run_repo_sync
-    echo "  -> Second sync complete."
 fi
+run_repo_sync
+echo "  -> Second sync complete."
 
 # ─── Pin drift check ─────────────────────────────────────────────────────────
 # Iterates over every entry in pins.yaml — adding a pin is a config-only
