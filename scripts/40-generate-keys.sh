@@ -63,6 +63,11 @@ echo "  -> Generating ${#CERTS[@]} certs into ${KEYS_DIR}/ ..."
 # stdin — the `read -p` returns empty, which triggers its -nocrypt branch.
 # make_key also refuses to overwrite, so we skip any cert that already exists
 # (e.g. partial run from a previous failed invocation).
+#
+# AOSP quirk: make_key sets `trap '... exit 1' EXIT INT QUIT`, so it ALWAYS
+# exits 1 even after a fully successful run. We swallow that exit code and
+# verify success by checking that the expected output files appeared — which
+# is the real success criterion anyway.
 cd "${SRC_DIR}"
 for cert in "${CERTS[@]}"; do
     if [[ -f "${KEYS_DIR}/${cert}.pk8" ]]; then
@@ -70,7 +75,11 @@ for cert in "${CERTS[@]}"; do
         continue
     fi
     echo "     ${cert} ..."
-    "${MAKE_KEY}" "${KEYS_DIR}/${cert}" "${SUBJECT}" </dev/null
+    "${MAKE_KEY}" "${KEYS_DIR}/${cert}" "${SUBJECT}" </dev/null || true
+    if [[ ! -f "${KEYS_DIR}/${cert}.pk8" || ! -f "${KEYS_DIR}/${cert}.x509.pem" ]]; then
+        echo "ERROR: make_key did not produce ${cert}.{pk8,x509.pem}" >&2
+        exit 1
+    fi
 done
 
 echo "==> [40] Done."

@@ -116,7 +116,14 @@ for module in "${APEX_MODULES[@]}"; do
     echo "     ${module} ..."
     # make_key refuses to overwrite, so clear any half-written leftovers.
     rm -f "${pk8}" "${pem_cert}"
-    "${MAKE_KEY_4096}" "${APEX_KEYS_DIR}/${module}" "${apex_subject}" </dev/null
+    # AOSP make_key always exits 1 via its EXIT trap even on success; swallow
+    # the bogus exit and verify success by checking that the output files
+    # appeared. Same pattern as step 40.
+    "${MAKE_KEY_4096}" "${APEX_KEYS_DIR}/${module}" "${apex_subject}" </dev/null || true
+    if [[ ! -f "${pk8}" || ! -f "${pem_cert}" ]]; then
+        echo "ERROR: make_key did not produce ${module}.{pk8,x509.pem}" >&2
+        exit 1
+    fi
 
     # Unwrap the private key to a .pem — sign_target_files_apks expects the
     # APEX payload key in this form (PKCS#8 PEM, no encryption).
