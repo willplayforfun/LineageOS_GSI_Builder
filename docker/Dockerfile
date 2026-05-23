@@ -52,6 +52,16 @@ RUN apt-get update \
        openjdk-11-jdk \
     && rm -rf /var/lib/apt/lists/*
 
+# Pipeline-specific tooling — packages this pipeline needs beyond the
+# LineageOS build prerequisites. Grows as the pipeline gains features; kept
+# in a separate RUN so adding entries here doesn't rebuild the base layer.
+# Each entry must do its own apt-get update + cleanup (a previous layer's
+# cached index would be removed by its own `rm -rf`, so we can't share).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       python3-yaml \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Google's repo tool from the canonical source.
 RUN curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo \
         -o /usr/local/bin/repo \

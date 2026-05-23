@@ -110,7 +110,7 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 - Create `/srv/src/.repo/local_manifests/` if absent.
 - Copy every `*.xml` from `/opt/pipeline/config/local_manifests/` into `/srv/src/.repo/local_manifests/`. This includes the pre-committed `andycgyan-unified.xml` (see below), so `repo sync` handles `lineage_build_unified` and `lineage_patches_unified` as proper repo projects rather than ad-hoc git clones.
 - Unless `SKIP_SYNC=1`: `repo sync -j${NPROC} --force-sync --no-tags --no-clone-bundle --optimized-fetch`.
-- After the first sync, **bootstrap the upstream treble manifest**: `lineage_build_unified/local_manifests_treble/manifest.xml` declares the treble-specific projects (`device/lineage/gsi`, `vendor/hardware_overlay`, `packages/apps/QcRilAm`, `vendor/gapps`). Mirror that file into `.repo/local_manifests/upstream-treble.xml` (only if it differs from what's already there), then run a second `repo sync` to pull those new projects. Subsequent runs skip the resync because the mirror already matches. This tracks upstream automatically — we don't commit a copy of AndyCGYan's manifest into our own repo. Same skip semantics as the first sync under `SKIP_SYNC=1`.
+- **Two-sync flow** to avoid an external HTTPS fetch for the upstream treble manifest. **First sync** pulls the default LineageOS tree plus the two projects declared by `andycgyan-unified.xml` (`lineage_build_unified`, `lineage_patches_unified`) — without pins applied and without treble-specific projects. After that, the script extracts `upstream-treble.xml` from the synced `lineage_build_unified` repo via `git show ${PIN_LBU}:local_manifests_treble/manifest.xml` (content-addressed by the pinned SHA, not the working-tree HEAD, so it stays deterministic if the pin and the branch tip ever diverge), generates `commit-pins.xml` from `pins.yaml`, and runs a **second `repo sync`** which applies the pins and pulls the treble-specific projects (`device/lineage/gsi`, `vendor/hardware_overlay`, `packages/apps/QcRilAm`, `vendor/gapps`). The second sync is incremental and fast on every run after the first.
 
 `config/local_manifests/andycgyan-unified.xml` must be committed to the pipeline repo with the following contents (or equivalent):
 
@@ -127,18 +127,24 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 
 This is the correct way to include extra repos in a `repo`-managed tree. `repo sync --force-sync` will keep them up to date alongside the rest of the source; `repo status` will include them; and there is no need for separate `git clone` / `git pull` logic in the script.
 
-### Revision pinning (`config/local_manifests/zz-pins.xml`)
+### Revision pinning (`config/pins.yaml` + `scripts/pins-tool.py`)
 
-Three projects are pinned to specific SHAs rather than tracking their default branches. The pin file is named `zz-*` so it loads alphabetically last in `.repo/local_manifests/`, after `andycgyan-unified.xml` and the bootstrapped `upstream-treble.xml` — meaning its `<project>` entries override theirs.
+Pinned project revisions live in `config/pins.yaml` — the single source of truth for everything pin-related (SHA, remote, tracking branch, upstream URL, category, human-readable note). `scripts/pins-tool.py` (Python, uses `python3-yaml`) reads that file and exposes three subcommands:
 
-Pin tiers:
+- `generate-manifest` — emit a repo local-manifest XML to stdout (one `<remove-project>+<project>` pair per pin). Step 00 redirects this into `.repo/local_manifests/commit-pins.xml` on every run; the XML is never committed.
+- `field <name-or-path> <field>` — print one field of one pin. Used by step 00 to pull the `lineage_build_unified` revision for the `upstream-treble.xml` bootstrap URL.
+- `list` — emit one TSV row per pin with all eight fields, for bash iteration in the drift check.
+
+Adding a pin is a YAML-only edit — no bash changes required.
+
+Pin tiers (category):
 
 1. **Archival** — `lineage_patches_unified` and `lineage_build_unified`. AndyCGYan's `lineage-20-light` branch has had no commits since Nov 2023; the pins record current HEAD. Won't drift in practice but pinning is explicit.
 2. **Frozen** — `TrebleDroid/vendor_hardware_overlay` at `1bbceba` (Nov 17 2023). Upstream is still active, but every commit since this SHA is device-specific runtime resource overlays we don't use. Freezing keeps AndyCGYan's bridge patches applicable without ongoing maintenance — specifically, it stops the "Exclude-TrebleApp" patch's trailing context from drifting.
 
-LineageOS-side projects are *not* pinned by default. They receive monthly security updates, and AndyCGYan's bridge patches generally survive LineageOS churn via `apply_patches.sh`'s fuzz fallback. Add a pin in `zz-pins.xml` only if a specific project's patches start failing in step 50.
+LineageOS-side projects are *not* pinned by default. They receive monthly security updates, and AndyCGYan's bridge patches generally survive LineageOS churn via `apply_patches.sh`'s fuzz fallback. Add a pin in `pins.yaml` only if a specific project's patches start failing in step 50.
 
-The pin drift check at the end of step 00 queries upstream HEAD for each pinned project via `git ls-remote` and prints whether each pin is up-to-date or behind. The SHAs in step 00's drift check must stay in sync with `zz-pins.xml` — bump both when advancing a pin.
+The pin drift check at the end of step 00 iterates over `pins-tool.py list`, queries upstream HEAD for each entry via `git ls-remote`, and prints whether each pin is up-to-date or behind — with the category and note from `pins.yaml` shown verbatim alongside the diff.
 
 ### `10-fetch-microg.sh`
 

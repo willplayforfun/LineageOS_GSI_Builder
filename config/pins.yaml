@@ -1,0 +1,56 @@
+# Pinned project revisions — single source of truth.
+#
+# Consumed by scripts/pins-tool.py (which step 00 uses to generate
+# .repo/local_manifests/commit-pins.xml and to drive the pin drift check).
+# Update a pin by editing this file and re-running ./build.sh; no other files
+# need to change.
+#
+# Fields per pin:
+#   name             — repo project name (matches LineageOS or upstream manifest)
+#   path             — source-tree path under /srv/src/
+#   remote           — repo manifest remote (must be defined elsewhere)
+#   revision         — full 40-char commit SHA to pin to
+#   upstream_url     — HTTPS URL for git ls-remote (drift check)
+#   tracking_branch  — branch on upstream whose HEAD we compare against
+#   category         — short label (archival, frozen, …) used in drift output
+#   note             — one-line human explanation, also shown in drift output
+#
+# Pin tiers (category):
+#   archival — branch is effectively dead; pin records HEAD for explicitness.
+#   frozen   — branch is active but newer commits aren't useful for us;
+#              freezing avoids ongoing patch-context maintenance.
+#
+# LineageOS-side projects (frameworks/base, system/core, …) are intentionally
+# NOT pinned — they receive monthly security updates, and AndyCGYan's bridge
+# patches survive LineageOS churn via apply_patches.sh's fuzz fallback. Add a
+# pin here only if a specific project's patches start failing in step 50.
+
+pins:
+  - name: lineage_patches_unified
+    path: lineage_patches_unified
+    remote: andycgyan
+    revision: 1865fc784bc72a2d82fb938f18edb66af90ba306
+    upstream_url: https://github.com/AndyCGYan/lineage_patches_unified
+    tracking_branch: lineage-20-light
+    category: archival
+    note: AndyCGYan branch effectively dead since Nov 2023, drift is informational only
+
+  - name: lineage_build_unified
+    path: lineage_build_unified
+    remote: andycgyan
+    revision: ba21a0d381b988cef51387896a603cc2871045b8
+    upstream_url: https://github.com/AndyCGYan/lineage_build_unified
+    tracking_branch: lineage-20-light
+    category: archival
+    note: AndyCGYan branch effectively dead since Nov 2023, drift is informational only
+
+  # Last commit before TrebleDroid started adding overlay entries that displace
+  # the trailing context of AndyCGYan's 0001-Exclude-TrebleApp-co.patch.
+  - name: TrebleDroid/vendor_hardware_overlay
+    path: vendor/hardware_overlay
+    remote: github
+    revision: 1bbceba47362299ae60cb96c08303fb5f930e853
+    upstream_url: https://github.com/TrebleDroid/vendor_hardware_overlay
+    tracking_branch: pie
+    category: frozen
+    note: newer commits add device overlays only; advance only if you need them

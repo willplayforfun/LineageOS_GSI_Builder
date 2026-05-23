@@ -11,5 +11,3 @@ Add a section to the README that is a guide for pinning SHAs when patches start 
 
 Add a section to the README describing the 3 layers of authorship and why things are pinned to where they are.
 
-I don't love the hardcoding of pins in 00-prep-source. 
-Better to generate the pin manifest from a config that is also used in the scripts to check against for drift.
