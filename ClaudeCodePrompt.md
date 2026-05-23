@@ -110,6 +110,7 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 - Create `/srv/src/.repo/local_manifests/` if absent.
 - Copy every `*.xml` from `/opt/pipeline/config/local_manifests/` into `/srv/src/.repo/local_manifests/`. This includes the pre-committed `andycgyan-unified.xml` (see below), so `repo sync` handles `lineage_build_unified` and `lineage_patches_unified` as proper repo projects rather than ad-hoc git clones.
 - Unless `SKIP_SYNC=1`: `repo sync -j${NPROC} --force-sync --no-tags --no-clone-bundle --optimized-fetch`.
+- After the first sync, **bootstrap the upstream treble manifest**: `lineage_build_unified/local_manifests_treble/manifest.xml` declares the treble-specific projects (`device/lineage/gsi`, `vendor/hardware_overlay`, `packages/apps/QcRilAm`, `vendor/gapps`). Mirror that file into `.repo/local_manifests/upstream-treble.xml` (only if it differs from what's already there), then run a second `repo sync` to pull those new projects. Subsequent runs skip the resync because the mirror already matches. This tracks upstream automatically — we don't commit a copy of AndyCGYan's manifest into our own repo. Same skip semantics as the first sync under `SKIP_SYNC=1`.
 
 `config/local_manifests/andycgyan-unified.xml` must be committed to the pipeline repo with the following contents (or equivalent):
 
