@@ -87,10 +87,11 @@ RUN mkdir -p /srv/src /srv/ccache /srv/keys /srv/intermediate /srv/out \
 # Copy pipeline files. Build context must be the repository root:
 #   docker build -f docker/Dockerfile .
 COPY docker/entrypoint.sh /opt/pipeline/entrypoint.sh
+COPY docker/fix-perms-entrypoint.sh /usr/local/bin/fix-perms-entrypoint.sh
 COPY scripts/ /opt/pipeline/scripts/
 COPY config/ /opt/pipeline/config/
 
-RUN chmod +x /opt/pipeline/entrypoint.sh \
+RUN chmod +x /opt/pipeline/entrypoint.sh /usr/local/bin/fix-perms-entrypoint.sh \
     && find /opt/pipeline/scripts -name '*.sh' -exec chmod +x {} + \
     && chown -R builder:builder /opt/pipeline
 
@@ -103,4 +104,8 @@ RUN git config --global user.email "builder@lineage-gsi-builder.local" \
 
 WORKDIR /srv/src
 
-ENTRYPOINT ["/opt/pipeline/entrypoint.sh"]
+# Container must start as root so fix-perms-entrypoint.sh can chown the bind-mounted
+# /srv directories, then it drops to builder via runuser.
+USER root
+
+ENTRYPOINT ["/usr/local/bin/fix-perms-entrypoint.sh"]
