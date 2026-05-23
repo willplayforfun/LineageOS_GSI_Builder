@@ -55,6 +55,29 @@ set +u
 # shellcheck disable=SC1091
 source build/envsetup.sh
 
+# ─── Pre-lunch diagnostic ───────────────────────────────────────────────────
+# If lunch later fails with "Can not locate config makefile for product",
+# the usual cause is that our vendor/microg AndroidProducts.mk isn't visible
+# to the build system's product-discovery glob. Print the relevant
+# filesystem state so we can see what's actually on disk and what find
+# resolves through the symlink. Safe to remove once the build is stable.
+echo "  -> Diagnostic: vendor/microg directory entry ..."
+ls -la vendor/microg 2>&1 | sed 's/^/       /'
+echo "  -> Diagnostic: AndroidProducts.mk files visible to product discovery ..."
+find -L vendor -maxdepth 6 -name AndroidProducts.mk 2>&1 | sed 's/^/       /'
+if [[ -f vendor/microg/AndroidProducts.mk ]]; then
+    echo "  -> Diagnostic: vendor/microg/AndroidProducts.mk content ..."
+    sed 's/^/       /' vendor/microg/AndroidProducts.mk
+else
+    echo "  -> Diagnostic: vendor/microg/AndroidProducts.mk NOT REACHABLE"
+fi
+if [[ -f vendor/microg/lineage_gsi_arm64_vN_microg.mk ]]; then
+    echo "  -> Diagnostic: lineage_gsi_arm64_vN_microg.mk content ..."
+    sed 's/^/       /' vendor/microg/lineage_gsi_arm64_vN_microg.mk
+else
+    echo "  -> Diagnostic: lineage_gsi_arm64_vN_microg.mk NOT REACHABLE"
+fi
+
 # ─── Lunch the microG wrapper product ───────────────────────────────────────
 # The wrapper inherits device/lineage/gsi/lineage_gsi_arm64_vN.mk (provided by
 # AndyCGYan/android_device_lineage_gsi via the unified manifest) and layers
