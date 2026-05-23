@@ -14,7 +14,10 @@ echo "==> [00] Preparing LineageOS source tree"
 SRC_DIR="/srv/src"
 MANIFESTS_SRC="/opt/pipeline/config/local_manifests"
 MANIFESTS_DST="${SRC_DIR}/.repo/local_manifests"
-PINS_TOOL="python3 /opt/pipeline/scripts/pins-tool.py"
+# Bash array (not a string) — we run with `IFS=$'\n\t'` which excludes space,
+# so word-splitting on a single-string command wouldn't produce separate argv
+# elements. `"${PINS_TOOL[@]}"` always expands correctly regardless of IFS.
+PINS_TOOL=(python3 /opt/pipeline/scripts/pins-tool.py)
 
 LINEAGE_URL="https://github.com/LineageOS/android.git"
 LINEAGE_BRANCH="lineage-20.0"
@@ -98,7 +101,7 @@ fi
 # deterministic against the pin and not against whatever default-branch tip
 # the sync happened to fetch. Single transport (git), content-addressed by
 # the pin SHA.
-PIN_LBU=$(${PINS_TOOL} field "lineage_build_unified" revision)
+PIN_LBU=$("${PINS_TOOL[@]}" field "lineage_build_unified" revision)
 UPSTREAM_TREBLE_FILE="${MANIFESTS_DST}/upstream-treble.xml"
 
 LBU_DIR="${SRC_DIR}/lineage_build_unified"
@@ -124,7 +127,7 @@ mv "${UPSTREAM_TREBLE_FILE}.tmp" "${UPSTREAM_TREBLE_FILE}"
 # repo-manifest form. Regenerated every run so a pins.yaml edit takes effect
 # on the next ./build.sh.
 echo "  -> Generating commit-pins.xml from config/pins.yaml ..."
-${PINS_TOOL} generate-manifest > "${MANIFESTS_DST}/commit-pins.xml"
+"${PINS_TOOL[@]}" generate-manifest > "${MANIFESTS_DST}/commit-pins.xml"
 
 # ─── Second repo sync ────────────────────────────────────────────────────────
 # Now that both upstream-treble.xml and commit-pins.xml are in place, this
@@ -179,7 +182,7 @@ else
         check_pin_drift \
             "${path}" "${revision}" "${upstream_url}" "${tracking_branch}" \
             "${category} pin — ${note}"
-    done < <(${PINS_TOOL} list)
+    done < <("${PINS_TOOL[@]}" list)
 fi
 
 touch /srv/intermediate/.stage-00-done
