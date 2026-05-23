@@ -127,6 +127,19 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 
 This is the correct way to include extra repos in a `repo`-managed tree. `repo sync --force-sync` will keep them up to date alongside the rest of the source; `repo status` will include them; and there is no need for separate `git clone` / `git pull` logic in the script.
 
+### Revision pinning (`config/local_manifests/zz-pins.xml`)
+
+Three projects are pinned to specific SHAs rather than tracking their default branches. The pin file is named `zz-*` so it loads alphabetically last in `.repo/local_manifests/`, after `andycgyan-unified.xml` and the bootstrapped `upstream-treble.xml` — meaning its `<project>` entries override theirs.
+
+Pin tiers:
+
+1. **Archival** — `lineage_patches_unified` and `lineage_build_unified`. AndyCGYan's `lineage-20-light` branch has had no commits since Nov 2023; the pins record current HEAD. Won't drift in practice but pinning is explicit.
+2. **Frozen** — `TrebleDroid/vendor_hardware_overlay` at `1bbceba` (Nov 17 2023). Upstream is still active, but every commit since this SHA is device-specific runtime resource overlays we don't use. Freezing keeps AndyCGYan's bridge patches applicable without ongoing maintenance — specifically, it stops the "Exclude-TrebleApp" patch's trailing context from drifting.
+
+LineageOS-side projects are *not* pinned by default. They receive monthly security updates, and AndyCGYan's bridge patches generally survive LineageOS churn via `apply_patches.sh`'s fuzz fallback. Add a pin in `zz-pins.xml` only if a specific project's patches start failing in step 50.
+
+The pin drift check at the end of step 00 queries upstream HEAD for each pinned project via `git ls-remote` and prints whether each pin is up-to-date or behind. The SHAs in step 00's drift check must stay in sync with `zz-pins.xml` — bump both when advancing a pin.
+
 ### `10-fetch-microg.sh`
 
 Reads `/opt/pipeline/config/microg-apks.txt`. Each line is `<filename> <url> <sha256>`. For each entry, if `/srv/intermediate/vendor-microg/prebuilts/<filename>` is absent or has wrong sha256, download and verify into that path. Do **not** write directly into `/srv/src/` — step 20 creates the source-tree symlink.

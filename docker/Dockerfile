@@ -16,7 +16,6 @@ RUN echo "deb http://archive.ubuntu.com/ubuntu focal universe" >> /etc/apt/sourc
     && echo "deb http://archive.ubuntu.com/ubuntu focal-updates universe" >> /etc/apt/sources.list
 
 # Install LineageOS 20 build prerequisites.
-# hadolint ignore=DL3008,DL3015
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        bc \
