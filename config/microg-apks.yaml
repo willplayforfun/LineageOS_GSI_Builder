@@ -1,0 +1,55 @@
+# Prebuilt APKs for microG and FLOSS replacements — single source of truth.
+#
+# Consumed by scripts/apks-tool.py (which step 10 uses to drive downloads and
+# step 20 uses to generate vendor/microg/{Android.mk,microg.mk}). Update an
+# APK by editing this file and re-running ./build.sh; no other files need to
+# change.
+#
+# Fields per APK:
+#   module       — LOCAL_MODULE / PRODUCT_PACKAGES name (no .apk suffix)
+#   filename     — local filename under vendor/microg/prebuilts/
+#   url          — fetch URL (GitHub release or vendor mirror)
+#   sha256       — full 64-char hex, or the literal "SKIP" to disable verify
+#   certificate  — "platform" or "PRESIGNED"
+#                    platform : signed with our build's platform key — required
+#                               for GmsCore / Companion so the LineageOS
+#                               framework grants FAKE_PACKAGE_SIGNATURE.
+#                    PRESIGNED: keep the upstream developer signature — used
+#                               for F-Droid and Aurora Store so they can
+#                               self-update and verify upstream-signed repos.
+#   privileged   — true ⇒ LOCAL_PRIVILEGED_MODULE := true
+#   note         — one-line human explanation, included as a comment in the
+#                  generated Android.mk
+
+apks:
+  - module: GmsCore
+    filename: GmsCore.apk
+    url: https://github.com/microg/GmsCore/releases/download/v0.3.15.250932/com.google.android.gms-250932030.apk
+    sha256: SKIP
+    certificate: platform
+    privileged: true
+    note: signed with platform key so the framework grants FAKE_PACKAGE_SIGNATURE
+
+  - module: Companion
+    filename: Companion.apk
+    url: https://github.com/microg/GmsCore/releases/download/v0.3.15.250932/com.android.vending-84022630.apk
+    sha256: SKIP
+    certificate: platform
+    privileged: true
+    note: microG FakeStore — also needs platform cert for signature spoofing
+
+  - module: FDroid
+    filename: FDroid.apk
+    url: https://f-droid.org/F-Droid.apk
+    sha256: SKIP
+    certificate: PRESIGNED
+    privileged: true
+    note: keep upstream developer signature for self-update + signed-repo verification
+
+  - module: AuroraStore
+    filename: AuroraStore.apk
+    url: https://auroraoss.com/downloads/AuroraStore/Stable/AuroraStore-4.7.1.apk
+    sha256: SKIP
+    certificate: PRESIGNED
+    privileged: true
+    note: keep upstream developer signature

@@ -8,6 +8,9 @@ IFS=$'\n\t'
 
 VENDOR_DIR="/srv/intermediate/vendor-microg"
 SRC_LINK="/srv/src/vendor/microg"
+# Array, not a string — we run with `IFS=$'\n\t'` (no space), so word-splitting
+# on a string variable would not produce separate argv elements.
+APKS_TOOL=(python3 /opt/pipeline/scripts/apks-tool.py)
 
 echo "==> [20] Staging vendor/microg"
 
@@ -20,74 +23,15 @@ echo "==> [20] Staging vendor/microg"
 mkdir -p "${VENDOR_DIR}/prebuilts"
 mkdir -p "${VENDOR_DIR}/permissions"
 
-# ─── Android.mk ───────────────────────────────────────────────────────────────
-echo "  -> Writing Android.mk ..."
-cat > "${VENDOR_DIR}/Android.mk" <<'ANDROID_MK'
-LOCAL_PATH := $(call my-dir)
+# ─── Android.mk + microg.mk (generated from config/microg-apks.yaml) ─────────
+# Both files are derived from the same YAML source; apks-tool emits the full
+# contents to stdout, so step 20 just redirects into place. Adding/removing
+# an APK is a YAML-only edit.
+echo "  -> Generating Android.mk from microg-apks.yaml ..."
+"${APKS_TOOL[@]}" generate-android-mk > "${VENDOR_DIR}/Android.mk"
 
-# GmsCore: signed with the platform key so the LineageOS framework grants the
-# FAKE_PACKAGE_SIGNATURE permission, which is what makes signature spoofing work.
-include $(CLEAR_VARS)
-LOCAL_MODULE             := GmsCore
-LOCAL_MODULE_CLASS       := APPS
-LOCAL_MODULE_TAGS        := optional
-LOCAL_SRC_FILES          := prebuilts/GmsCore.apk
-LOCAL_CERTIFICATE        := platform
-LOCAL_PRIVILEGED_MODULE  := true
-LOCAL_PRODUCT_MODULE     := true
-include $(BUILD_PREBUILT)
-
-# Companion (microG FakeStore): also needs platform cert for the same reason.
-include $(CLEAR_VARS)
-LOCAL_MODULE             := Companion
-LOCAL_MODULE_CLASS       := APPS
-LOCAL_MODULE_TAGS        := optional
-LOCAL_SRC_FILES          := prebuilts/Companion.apk
-LOCAL_CERTIFICATE        := platform
-LOCAL_PRIVILEGED_MODULE  := true
-LOCAL_PRODUCT_MODULE     := true
-include $(BUILD_PREBUILT)
-
-# F-Droid: keep the upstream developer signature so the app can self-update and
-# verify repos signed against that key.
-include $(CLEAR_VARS)
-LOCAL_MODULE             := FDroid
-LOCAL_MODULE_CLASS       := APPS
-LOCAL_MODULE_TAGS        := optional
-LOCAL_SRC_FILES          := prebuilts/FDroid.apk
-LOCAL_CERTIFICATE        := PRESIGNED
-LOCAL_PRIVILEGED_MODULE  := true
-LOCAL_PRODUCT_MODULE     := true
-include $(BUILD_PREBUILT)
-
-# Aurora Store: same reasoning as F-Droid.
-include $(CLEAR_VARS)
-LOCAL_MODULE             := AuroraStore
-LOCAL_MODULE_CLASS       := APPS
-LOCAL_MODULE_TAGS        := optional
-LOCAL_SRC_FILES          := prebuilts/AuroraStore.apk
-LOCAL_CERTIFICATE        := PRESIGNED
-LOCAL_PRIVILEGED_MODULE  := true
-LOCAL_PRODUCT_MODULE     := true
-include $(BUILD_PREBUILT)
-ANDROID_MK
-
-# ─── microg.mk ────────────────────────────────────────────────────────────────
-echo "  -> Writing microg.mk ..."
-cat > "${VENDOR_DIR}/microg.mk" <<'MICROG_MK'
-# Add microG and FLOSS apps to the product image.
-PRODUCT_PACKAGES += \
-    GmsCore \
-    Companion \
-    FDroid \
-    AuroraStore
-
-# Install the privapp-permissions file that grants FAKE_PACKAGE_SIGNATURE to
-# com.google.android.gms (i.e. GmsCore). Without this the framework will not
-# honour the permission even though the APK declares it.
-PRODUCT_COPY_FILES += \
-    vendor/microg/permissions/privapp-permissions-com.google.android.gms.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/privapp-permissions-com.google.android.gms.xml
-MICROG_MK
+echo "  -> Generating microg.mk from microg-apks.yaml ..."
+"${APKS_TOOL[@]}" generate-microg-mk > "${VENDOR_DIR}/microg.mk"
 
 # ─── AndroidProducts.mk ──────────────────────────────────────────────────────
 # Auto-discovered by build/envsetup.sh under any vendor/*. Declaring the

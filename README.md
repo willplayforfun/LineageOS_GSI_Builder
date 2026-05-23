@@ -83,7 +83,7 @@ future OTA packages that will be accepted by existing installations.
 - **Branch maintenance**: The `lineage-20-light` branch may not receive security
   patches indefinitely. Check the AndyCGYan repository for branch status before
   relying on this for production use.
-- **AuroraStore URL**: The AuroraStore download URL in `config/microg-apks.txt` may
+- **AuroraStore URL**: The AuroraStore download URL in `config/microg-apks.yaml` may
   become stale when new versions are released. Update it to the latest stable
   release from the AuroraOSS website.
 
@@ -93,15 +93,15 @@ future OTA packages that will be accepted by existing installations.
 
 ### Changing microG / FLOSS app versions
 
-Edit `config/microg-apks.txt`. Each line is:
+Edit `config/microg-apks.yaml`. Each entry under `apks:` carries `module`,
+`filename`, `url`, `sha256`, `certificate` (`platform` or `PRESIGNED`),
+`privileged`, and a free-text `note`. The `sha256` field defaults to `SKIP`
+to keep the build from breaking when upstream bumps versions; for production
+use, replace `SKIP` with the actual 64-char hex digest.
 
-```
-<local filename>  <url>  <sha256 or SKIP>
-```
-
-Replace the URL and optionally pin the sha256 for reproducibility. The `SKIP`
-default disables verification so the build doesn't break when upstream bumps
-versions — for production use, replace `SKIP` with the actual sha256 hash.
+Adding a new APK is a YAML-only edit — `scripts/apks-tool.py` regenerates the
+downloads list and the `vendor/microg/{Android.mk,microg.mk}` files
+automatically on the next build.
 
 ### Changing the X.509 certificate subject
 

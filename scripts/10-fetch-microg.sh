@@ -5,7 +5,10 @@ set -euo pipefail
 IFS=$'\n\t'
 
 SENTINEL="/srv/intermediate/.stage-10-done"
-APK_LIST="/opt/pipeline/config/microg-apks.txt"
+# Array, not a string — we run with `IFS=$'\n\t'` (no space), so word-splitting
+# on a string variable would not produce separate argv elements. See the
+# matching note in 00-prep-source.sh.
+APKS_TOOL=(python3 /opt/pipeline/scripts/apks-tool.py)
 PREBUILTS_DIR="/srv/intermediate/vendor-microg/prebuilts"
 STRICT="${STRICT:-0}"
 
@@ -28,12 +31,9 @@ fi
 mkdir -p "${PREBUILTS_DIR}"
 
 # ─── Parse and download ───────────────────────────────────────────────────────
-while IFS= read -r line; do
-    # Skip blank lines and comment lines
-    [[ -z "${line}" || "${line}" =~ ^[[:space:]]*# ]] && continue
-
-    IFS=$' \t' read -r filename url sha256 <<< "${line}"
-
+# apks-tool.py emits one TSV row per APK (filename<TAB>url<TAB>sha256); the
+# YAML is the single source of truth, so no blank/comment handling needed.
+while IFS=$'\t' read -r filename url sha256; do
     dest="${PREBUILTS_DIR}/${filename}"
 
     # ── SHA256 check for already-present files ────────────────────────────────
@@ -54,14 +54,14 @@ while IFS= read -r line; do
     # ── STRICT mode: fail if sha256 is SKIP ───────────────────────────────────
     if [[ "${STRICT}" == "1" && "${sha256}" == "SKIP" ]]; then
         echo "ERROR: --strict mode enabled but sha256 for ${filename} is SKIP." >&2
-        echo "       Pin a sha256 in config/microg-apks.txt for reproducible builds." >&2
+        echo "       Pin a sha256 in config/microg-apks.yaml for reproducible builds." >&2
         exit 1
     fi
 
     echo "  -> Downloading ${filename} from ${url} ..."
     if ! curl -fsSL --retry 3 --retry-delay 5 -o "${dest}.tmp" "${url}"; then
         echo "ERROR: Failed to download ${filename} from ${url}." >&2
-        echo "       Check config/microg-apks.txt for misconfiguration." >&2
+        echo "       Check config/microg-apks.yaml for misconfiguration." >&2
         rm -f "${dest}.tmp"
         exit 1
     fi
@@ -84,7 +84,7 @@ while IFS= read -r line; do
     mv "${dest}.tmp" "${dest}"
     echo "     Saved to ${dest}."
 
-done < "${APK_LIST}"
+done < <("${APKS_TOOL[@]}" list-downloads)
 
 touch "${SENTINEL}"
 echo "==> [10] Done."

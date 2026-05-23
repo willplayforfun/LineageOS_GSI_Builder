@@ -57,7 +57,8 @@ from the repository root. The script must:
 │   ├── 60-sign.sh                     # Sign target files (incl. APEXes), extract system.img
 │   └── 99-report.sh                   # Print final summary
 ├── config/
-│   ├── microg-apks.txt                # URL + sha256 list of APKs to fetch
+│   ├── microg-apks.yaml               # APK metadata (filename, URL, sha256, certificate, ...)
+│   ├── pins.yaml                      # Pinned project revisions (single source of truth)
 │   ├── cert-subject.txt               # X.509 subject line for key generation
 │   └── local_manifests/               # .xml files copied into .repo/local_manifests/ before sync
 │       └── andycgyan-unified.xml      # Declares lineage_build_unified + lineage_patches_unified
@@ -148,21 +149,11 @@ The pin drift check at the end of step 00 iterates over `pins-tool.py list`, que
 
 ### `10-fetch-microg.sh`
 
-Reads `/opt/pipeline/config/microg-apks.txt`. Each line is `<filename> <url> <sha256>`. For each entry, if `/srv/intermediate/vendor-microg/prebuilts/<filename>` is absent or has wrong sha256, download and verify into that path. Do **not** write directly into `/srv/src/` — step 20 creates the source-tree symlink.
+APK metadata lives in `config/microg-apks.yaml` (see step 20 below for the schema). Step 10 iterates over `apks-tool.py list-downloads`, which emits one `filename<TAB>url<TAB>sha256` row per entry; the script downloads each into `/srv/intermediate/vendor-microg/prebuilts/<filename>` if absent or sha256-mismatched. Do **not** write directly into `/srv/src/` — step 20 creates the source-tree symlink.
 
 Create `/srv/intermediate/vendor-microg/prebuilts/` if absent before downloading.
 
-Initial contents of `microg-apks.txt` (verify URLs against the current state of the upstream repos before writing — the microG GmsCore project on GitHub publishes signed APKs on its Releases page, and F-Droid + Aurora publish through their own channels):
-
-```
-# format: <local filename>  <url>  <sha256, or 'SKIP' to skip verification>
-GmsCore.apk     https://github.com/microg/GmsCore/releases/download/v0.3.15.250932/com.google.android.gms-250932030.apk     SKIP
-Companion.apk   https://github.com/microg/GmsCore/releases/download/v0.3.15.250932/com.android.vending-84022630.apk         SKIP
-FDroid.apk      https://f-droid.org/F-Droid.apk                                                                              SKIP
-AuroraStore.apk https://auroraoss.com/downloads/AuroraStore/Stable/AuroraStore-4.7.1.apk                                     SKIP
-```
-
-The default `SKIP` is so the build doesn't break when versions get bumped upstream. Add a `--strict` mode to the script that fails on `SKIP`. Document in the README that users wanting reproducibility should pin sha256s themselves.
+The default `sha256: SKIP` keeps the build from breaking when versions get bumped upstream. The script supports `--strict` which fails on `SKIP` so reproducible builds can be enforced; document in the README that users wanting reproducibility should pin sha256 digests themselves.
 
 If any download URL is no longer valid at script-creation time, fall back to documenting the issue in `README.md` under "Known issues" rather than crashing.
 
@@ -172,8 +163,8 @@ Writes all generated `vendor/microg` content into `/srv/intermediate/vendor-micr
 
 Specifically, the script generates these files under `/srv/intermediate/vendor-microg/`:
 
-- `Android.mk` — declares four `BUILD_PREBUILT` modules: `GmsCore`, `Companion`, `FDroid`, `AuroraStore`. For `GmsCore` and `Companion`, use `LOCAL_CERTIFICATE := platform` (this is what makes microG's signature spoofing work cleanly — they get signed with the build's platform key, and LineageOS's framework grants spoof permission to platform-signed apps). For `FDroid` and `AuroraStore`, use `LOCAL_CERTIFICATE := PRESIGNED` (keep the upstream developer signatures intact). All four are `LOCAL_PRIVILEGED_MODULE := true` and `LOCAL_PRODUCT_MODULE := true`. Each module's `LOCAL_SRC_FILES` points to `prebuilts/<filename>`, which is populated by step 10.
-- `microg.mk` — adds those four modules to `PRODUCT_PACKAGES` and grants the `FAKE_PACKAGE_SIGNATURE` permission to `com.google.android.gms` via `PRODUCT_COPY_FILES` of a privapp-permissions XML.
+- `Android.mk` — **generated** by `apks-tool.py generate-android-mk` from `config/microg-apks.yaml`. Each YAML entry becomes one `BUILD_PREBUILT` module with `LOCAL_MODULE`, `LOCAL_SRC_FILES`, and `LOCAL_CERTIFICATE` (per-entry: `platform` for GmsCore/Companion so the framework grants `FAKE_PACKAGE_SIGNATURE` to platform-signed apps; `PRESIGNED` for F-Droid/Aurora Store so their upstream developer signatures stay intact). `LOCAL_PRIVILEGED_MODULE := true` and `LOCAL_PRODUCT_MODULE := true` apply to all current entries.
+- `microg.mk` — **generated** by `apks-tool.py generate-microg-mk` from the same YAML. Dynamic `PRODUCT_PACKAGES` (module names from YAML) followed by a static `PRODUCT_COPY_FILES` block for the GmsCore privapp-permissions XML. The `PRODUCT_COPY_FILES` block intentionally lives in the tool (not as a per-APK YAML field) because it's GmsCore-specific and not actually per-APK metadata; if another APK ever needs its own static extras, add a second static block in the tool.
 - `AndroidProducts.mk` — auto-discovered by `build/envsetup.sh` under `vendor/*`, this registers the wrapper product (`lineage_gsi_arm64_vN_microg`) and its lunch combos. Per AOSP convention it may only reference `$(LOCAL_DIR)` and must not use conditionals.
 - `lineage_gsi_arm64_vN_microg.mk` — the wrapper product itself. `inherit-product`s `device/lineage/gsi/lineage_gsi_arm64_vN.mk` (AndyCGYan's per-variant lineage GSI base product, brought in by the unified manifest), then `inherit-product`s `vendor/microg/microg.mk`, then sets `PRODUCT_NAME := lineage_gsi_arm64_vN_microg`. This is the linchpin that lets us combine the upstream lineage GSI product with our microG package set without touching any repo-managed file. The variant suffix is part of the name because the upstream `lineage_gsi_arm64_{vN,vS,gN}.mk` files are statically variant-specific — to support a different variant later, add a second wrapper inheriting the corresponding base. See section 30 below for the design rationale.
 - `permissions/privapp-permissions-com.google.android.gms.xml` — created inline in the script.
@@ -305,7 +296,7 @@ The README should cover, in this order:
 4. **Flashing** — sample `fastboot flash system out/system.img` invocation, with a warning about unlocked bootloader requirement and a pointer to the Treble Info app for compatibility checking.
 5. **Reusing signing keys** — explain that `./keys/` is preserved between runs and that users who plan to ship signed updates to existing installs MUST back up `./keys/` privately (and never commit it).
 6. **Known issues / caveats** — patch application can fail when upstream changes; microG signature spoofing requires LineageOS's framework patch which the `lineage-20-light` source tree should already have but is worth verifying; the unified build branch may be unmaintained relative to current security patches. (APEX keys are handled automatically by step 55 — no manual intervention needed.)
-7. **Customisation** — pointers to `config/microg-apks.txt` (change versions), `config/cert-subject.txt` (change subject line), and the `VARIANT` env var (change build flavour, e.g. `64GN` for "with GAPPS, no superuser" — but note that bringing back GAPPS defeats the microG purpose).
+7. **Customisation** — pointers to `config/microg-apks.yaml` (change versions or add APKs), `config/pins.yaml` (advance pinned project revisions), `config/cert-subject.txt` (change subject line), and the `VARIANT` env var (change build flavour, e.g. `64GN` for "with GAPPS, no superuser" — but note that bringing back GAPPS defeats the microG purpose).
 8. **Acknowledgements** — credit AndyCGYan, microG project, F-Droid, Aurora Store, LineageOS, phhusson/TrebleDroid.
 
 ## Things to be careful about
