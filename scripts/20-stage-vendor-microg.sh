@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
-# Purpose: Generate vendor/microg build files in the intermediate area and symlink into the source tree.
+# Purpose: Generate vendor/microg build files (incl. an AndroidProducts.mk
+# wrapper product `treble_arm64_microg`) in the intermediate area and symlink
+# into the source tree.
 
 set -euo pipefail
 IFS=$'\n\t'
 
-SENTINEL="/srv/intermediate/.stage-20-done"
 VENDOR_DIR="/srv/intermediate/vendor-microg"
 SRC_LINK="/srv/src/vendor/microg"
 
 echo "==> [20] Staging vendor/microg"
 
-if [[ -f "${SENTINEL}" ]]; then
-    echo "  -> Sentinel found — vendor/microg already staged."
-    # Still (re)apply the symlink in case src/ was wiped but intermediate/ was not.
-    ln -sfn "${VENDOR_DIR}" "${SRC_LINK}"
-    echo "==> [20] Done (cached)."
-    exit 0
-fi
+# All work below is cheap and idempotent (clobbering writes + ln -sfn), so we
+# rerun it every invocation rather than gating on a sentinel — that keeps the
+# staged content in lockstep with whatever this script currently emits, even
+# if it has changed since a previous run.
 
 # Ensure the prebuilts dir exists but never clobber APKs placed there by step 10.
 mkdir -p "${VENDOR_DIR}/prebuilts"
@@ -91,6 +89,36 @@ PRODUCT_COPY_FILES += \
     vendor/microg/permissions/privapp-permissions-com.google.android.gms.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/privapp-permissions-com.google.android.gms.xml
 MICROG_MK
 
+# ─── AndroidProducts.mk ──────────────────────────────────────────────────────
+# Auto-discovered by build/envsetup.sh under any vendor/*. Declaring the
+# wrapper product here is what makes `lunch treble_arm64_microg-userdebug`
+# resolvable without modifying any repo-managed file. Per AOSP convention this
+# file must only reference $(LOCAL_DIR) (which the build system pre-sets to the
+# containing directory) and must not use conditionals.
+echo "  -> Writing AndroidProducts.mk ..."
+cat > "${VENDOR_DIR}/AndroidProducts.mk" <<'ANDROID_PRODUCTS_MK'
+PRODUCT_MAKEFILES := \
+    $(LOCAL_DIR)/treble_arm64_microg.mk
+
+COMMON_LUNCH_CHOICES := \
+    treble_arm64_microg-userdebug \
+    treble_arm64_microg-user \
+    treble_arm64_microg-eng
+ANDROID_PRODUCTS_MK
+
+# ─── treble_arm64_microg.mk (wrapper product) ────────────────────────────────
+# Inherits the upstream Treble product makefile (generated per-variant by
+# device/phh/treble/generate.sh) and layers vendor/microg/microg.mk on top, so
+# a single lunch target produces a microG GSI without touching any
+# repo-managed file. 
+echo "  -> Writing treble_arm64_microg.mk ..."
+cat > "${VENDOR_DIR}/treble_arm64_microg.mk" <<'WRAPPER_MK'
+$(call inherit-product, device/phh/treble/lineage.mk)
+$(call inherit-product, vendor/microg/microg.mk)
+
+PRODUCT_NAME := treble_arm64_microg
+WRAPPER_MK
+
 # ─── privapp-permissions XML ──────────────────────────────────────────────────
 echo "  -> Writing permissions/privapp-permissions-com.google.android.gms.xml ..."
 cat > "${VENDOR_DIR}/permissions/privapp-permissions-com.google.android.gms.xml" <<'PERMS_XML'
@@ -111,5 +139,4 @@ PERMS_XML
 echo "  -> Symlinking ${VENDOR_DIR} → ${SRC_LINK} ..."
 ln -sfn "${VENDOR_DIR}" "${SRC_LINK}"
 
-touch "${SENTINEL}"
 echo "==> [20] Done."

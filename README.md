@@ -134,10 +134,9 @@ VARIANT=64VS ./build.sh   # arm64, vanilla, with su (superuser)
 | `00-prep-source.sh` | `repo init` + `repo sync` + local manifests |
 | `10-fetch-microg.sh` | Download microG / FLOSS APKs into `intermediate/` |
 | `20-stage-vendor-microg.sh` | Write `vendor/microg/` build rules and symlink into source tree |
-| `30-patch-treble-product.sh` | Wire `microg.mk` into the Treble product makefile |
 | `40-generate-keys.sh` | Generate LineageOS release-signing keys (idempotent) |
 | `45-stage-vendor-keys.sh` | Symlink keys into `vendor/lineage-priv/keys/` |
-| `50-build.sh` | Drive `buildbot_unified.sh` for the actual compile |
+| `50-build.sh` | Apply patches, run `generate.sh`, `lunch` the wrapper product, then `make` |
 | `60-sign.sh` | Sign target files and extract `system.img` |
 | `99-report.sh` | Print build summary |
 
