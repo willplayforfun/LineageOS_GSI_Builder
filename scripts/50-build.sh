@@ -44,7 +44,14 @@ bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_treble"
 
 # ─── Source envsetup ────────────────────────────────────────────────────────
 # Sourced after patches in case any patch modifies envsetup itself.
+#
+# AOSP's envsetup.sh references variables like TOP and ZSH_VERSION without
+# guards, on the assumption it's sourced in a relaxed shell. Our `set -u`
+# (nounset) treats those as fatal errors, so disable nounset for the duration
+# of the source — and lunch, which also reads back into envsetup's helpers.
+# Restore it afterwards so the rest of the script keeps its safety net.
 echo "  -> Sourcing build/envsetup.sh ..."
+set +u
 # shellcheck disable=SC1091
 source build/envsetup.sh
 
@@ -54,6 +61,7 @@ source build/envsetup.sh
 # vendor/microg/microg.mk on top. See scripts/20-stage-vendor-microg.sh.
 echo "  -> Lunching ${LUNCH_TARGET} ..."
 lunch "${LUNCH_TARGET}"
+set -u  # restore nounset now that envsetup + lunch are done
 
 # ─── Build ──────────────────────────────────────────────────────────────────
 # `target-files-package` produces the unsigned target-files zip (consumed by
