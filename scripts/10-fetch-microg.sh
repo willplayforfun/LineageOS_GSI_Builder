@@ -32,7 +32,7 @@ while IFS= read -r line; do
     # Skip blank lines and comment lines
     [[ -z "${line}" || "${line}" =~ ^[[:space:]]*# ]] && continue
 
-    read -r filename url sha256 <<< "${line}"
+    IFS=$' \t' read -r filename url sha256 <<< "${line}"
 
     dest="${PREBUILTS_DIR}/${filename}"
 
