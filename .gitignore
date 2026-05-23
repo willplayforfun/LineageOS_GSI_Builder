@@ -1,0 +1,8 @@
+src/
+ccache/
+out/
+keys/
+intermediate/
+*.swp
+*.swo
+.DS_Store
