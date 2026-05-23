@@ -132,7 +132,7 @@ This is the correct way to include extra repos in a `repo`-managed tree. `repo s
 
 Pinned project revisions live in `config/pins.yaml` — the single source of truth for everything pin-related (SHA, remote, tracking branch, upstream URL, category, human-readable note). `scripts/pins-tool.py` (Python, uses `python3-yaml`) reads that file and exposes three subcommands:
 
-- `generate-manifest` — emit a repo local-manifest XML to stdout (one `<remove-project>+<project>` pair per pin). Step 00 redirects this into `.repo/local_manifests/commit-pins.xml` on every run; the XML is never committed.
+- `generate-manifest` — emit a repo local-manifest XML to stdout (one `<remove-project>+<project>` pair per pin). Step 00 redirects this into `.repo/local_manifests/zz-commit-pins.xml` on every run; the XML is never committed. The `zz-` prefix is load-bearing: repo processes local manifests alphabetically, and our `<remove-project>` entries require the targets to already be declared by `andycgyan-unified.xml` and `upstream-treble.xml`.
 - `field <name-or-path> <field>` — print one field of one pin. Used by step 00 to pull the `lineage_build_unified` revision for the `upstream-treble.xml` bootstrap URL.
 - `list` — emit one TSV row per pin with all eight fields, for bash iteration in the drift check.
 

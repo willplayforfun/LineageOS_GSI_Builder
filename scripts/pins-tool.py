@@ -5,8 +5,7 @@ Subcommands:
 
     pins-tool.py generate-manifest
         Emit a repo local-manifest XML to stdout — one
-        <remove-project> + <project> pair per pin. Used by step 00 to
-        write .repo/local_manifests/commit-pins.xml.
+        <remove-project> + <project> pair per pin. Used by step 00.
 
     pins-tool.py field <name-or-path> <field>
         Print one field of one pin, looked up by `name` or `path`. Used

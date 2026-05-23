@@ -2,7 +2,7 @@
 # Purpose: Initialise and sync the LineageOS repo source tree. Two-sync flow:
 # first sync pulls the base tree + lineage_*_unified; we then extract the
 # upstream treble manifest from lineage_build_unified at the pinned SHA via
-# `git show`, generate commit-pins.xml from config/pins.yaml, and second-sync
+# `git show`, generate zz-commit-pins.xml from config/pins.yaml, and second-sync
 # to pull the treble-specific projects and apply the pins. Finally reports
 # pin drift vs upstream.
 
@@ -57,7 +57,7 @@ mkdir -p "${MANIFESTS_DST}"
 
 # ─── Local manifests: committed XMLs ─────────────────────────────────────────
 # Copy every committed local manifest (today: andycgyan-unified.xml) from the
-# pipeline config dir into .repo/local_manifests/. commit-pins.xml and
+# pipeline config dir into .repo/local_manifests/. zz-commit-pins.xml and
 # upstream-treble.xml are NOT committed — they're produced below after the
 # first sync.
 echo "  -> Installing committed local manifests ..."
@@ -82,7 +82,7 @@ fi
 # ─── First repo sync ─────────────────────────────────────────────────────────
 # Pulls the default LineageOS tree plus the two projects declared by
 # andycgyan-unified.xml (lineage_build_unified, lineage_patches_unified).
-# Doesn't yet apply pins (commit-pins.xml not generated) or pull
+# Doesn't yet apply pins (zz-commit-pins.xml not generated) or pull
 # treble-specific projects (upstream-treble.xml not installed) — both happen
 # in the second sync below.
 if [[ "${SKIP_SYNC}" == "1" ]]; then
@@ -122,15 +122,25 @@ if ! git -C "${LBU_DIR}" show "${PIN_LBU}:local_manifests_treble/manifest.xml" \
 fi
 mv "${UPSTREAM_TREBLE_FILE}.tmp" "${UPSTREAM_TREBLE_FILE}"
 
-# ─── Generate commit-pins.xml from pins.yaml ─────────────────────────────────
+# ─── Generate zz-commit-pins.xml from pins.yaml ──────────────────────────────
 # Single source of truth for pinned revisions; pins-tool.py emits the
 # repo-manifest form. Regenerated every run so a pins.yaml edit takes effect
 # on the next ./build.sh.
-echo "  -> Generating commit-pins.xml from config/pins.yaml ..."
-"${PINS_TOOL[@]}" generate-manifest > "${MANIFESTS_DST}/commit-pins.xml"
+#
+# The "zz-" prefix is load-bearing: repo processes .repo/local_manifests/*.xml
+# in alphabetical order, and our <remove-project> entries require the target
+# project to already be declared — which means this file MUST sort after both
+# andycgyan-unified.xml (declares lineage_*_unified) AND upstream-treble.xml
+# (declares TrebleDroid/vendor_hardware_overlay).
+#
+# One-time migration: clean up older filenames this manifest used to live at.
+rm -f "${MANIFESTS_DST}/commit-pins.xml" "${MANIFESTS_DST}/zz-pins.xml"
+
+echo "  -> Generating zz-commit-pins.xml from config/pins.yaml ..."
+"${PINS_TOOL[@]}" generate-manifest > "${MANIFESTS_DST}/zz-commit-pins.xml"
 
 # ─── Second repo sync ────────────────────────────────────────────────────────
-# Now that both upstream-treble.xml and commit-pins.xml are in place, this
+# Now that both upstream-treble.xml and zz-commit-pins.xml are in place, this
 # sync resets the pinned projects to their pinned SHAs and pulls the
 # treble-specific projects declared by the upstream manifest (device/lineage/gsi,
 # vendor/hardware_overlay, packages/apps/QcRilAm, vendor/gapps). Incremental

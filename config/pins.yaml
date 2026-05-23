@@ -1,7 +1,7 @@
 # Pinned project revisions — single source of truth.
 #
 # Consumed by scripts/pins-tool.py (which step 00 uses to generate
-# .repo/local_manifests/commit-pins.xml and to drive the pin drift check).
+# .repo/local_manifests/zz-commit-pins.xml and to drive the pin drift check).
 # Update a pin by editing this file and re-running ./build.sh; no other files
 # need to change.
 #
