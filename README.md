@@ -6,7 +6,7 @@ apps. The entire build runs inside Docker so the host stays clean.
 
 The output is a single `system.img` (sparse Android image) suitable for flashing
 to the `system` partition of any Treble-compliant arm64 A/B device with an
-unlocked bootloader — equivalent to AndyCGYan's `treble_arm64_bvN` target on the
+unlocked bootloader — equivalent to AndyCGYan's `lineage_gsi_arm64_vN` target on the
 `lineage-20-light` branch, signed with self-generated release keys.
 
 ---
@@ -134,14 +134,16 @@ VARIANT=64VS ./build.sh   # arm64, vanilla, with su (superuser)
 | `00-prep-source.sh` | `repo init` + `repo sync` + local manifests |
 | `10-fetch-microg.sh` | Download microG / FLOSS APKs into `intermediate/` |
 | `20-stage-vendor-microg.sh` | Write `vendor/microg/` build rules and symlink into source tree |
-| `40-generate-keys.sh` | Generate LineageOS release-signing keys (idempotent) |
-| `45-stage-vendor-keys.sh` | Symlink keys into `vendor/lineage-priv/keys/` |
-| `50-build.sh` | Apply patches, run `generate.sh`, `lunch` the wrapper product, then `make` |
-| `60-sign.sh` | Sign target files and extract `system.img` |
+| `40-generate-keys.sh` | Generate the standard 12-key LineageOS release-signing set (idempotent) |
+| `45-stage-vendor-keys.sh` | Stage `vendor/lineage-priv/keys/` (writes `Android.mk`/`keys.mk`, symlinks key material) |
+| `50-build.sh` | Apply `lineage_patches_unified` patches, `lunch` the microG wrapper product, then `make target-files-package otatools` |
+| `55-generate-apex-keys.sh` | Discover APEX modules in the unsigned target files and mint 4096-bit APEX keys on demand |
+| `60-sign.sh` | Sign target files (incl. discovered APEXes) and extract `system.img` |
 | `99-report.sh` | Print build summary |
 
-> **Current status**: Only `00-prep-source.sh` and `99-report.sh` are implemented.
-> The remaining scripts are planned for subsequent iterations.
+> **Current status**: All scripts above are implemented. The pipeline has not
+> yet been end-to-end validated with a successful build — first runs may
+> surface lunch-target or patch-application issues that require iteration.
 
 ---
 

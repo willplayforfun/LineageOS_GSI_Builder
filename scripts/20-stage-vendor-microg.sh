@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Purpose: Generate vendor/microg build files (incl. an AndroidProducts.mk
-# wrapper product `treble_arm64_microg`) in the intermediate area and symlink
-# into the source tree.
+# wrapper product `lineage_gsi_arm64_vN_microg`) in the intermediate area and
+# symlink into the source tree.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -91,32 +91,35 @@ MICROG_MK
 
 # ─── AndroidProducts.mk ──────────────────────────────────────────────────────
 # Auto-discovered by build/envsetup.sh under any vendor/*. Declaring the
-# wrapper product here is what makes `lunch treble_arm64_microg-userdebug`
+# wrapper product here is what makes `lunch lineage_gsi_arm64_vN_microg-userdebug`
 # resolvable without modifying any repo-managed file. Per AOSP convention this
 # file must only reference $(LOCAL_DIR) (which the build system pre-sets to the
 # containing directory) and must not use conditionals.
 echo "  -> Writing AndroidProducts.mk ..."
 cat > "${VENDOR_DIR}/AndroidProducts.mk" <<'ANDROID_PRODUCTS_MK'
 PRODUCT_MAKEFILES := \
-    $(LOCAL_DIR)/treble_arm64_microg.mk
+    $(LOCAL_DIR)/lineage_gsi_arm64_vN_microg.mk
 
 COMMON_LUNCH_CHOICES := \
-    treble_arm64_microg-userdebug \
-    treble_arm64_microg-user \
-    treble_arm64_microg-eng
+    lineage_gsi_arm64_vN_microg-userdebug \
+    lineage_gsi_arm64_vN_microg-user \
+    lineage_gsi_arm64_vN_microg-eng
 ANDROID_PRODUCTS_MK
 
-# ─── treble_arm64_microg.mk (wrapper product) ────────────────────────────────
-# Inherits the upstream Treble product makefile (generated per-variant by
-# device/phh/treble/generate.sh) and layers vendor/microg/microg.mk on top, so
-# a single lunch target produces a microG GSI without touching any
-# repo-managed file. 
-echo "  -> Writing treble_arm64_microg.mk ..."
-cat > "${VENDOR_DIR}/treble_arm64_microg.mk" <<'WRAPPER_MK'
-$(call inherit-product, device/phh/treble/lineage.mk)
+# ─── lineage_gsi_arm64_vN_microg.mk (wrapper product) ────────────────────────
+# Inherits AndyCGYan's per-variant lineage GSI product makefile and layers
+# vendor/microg/microg.mk on top, so a single lunch target produces a microG
+# GSI without touching any repo-managed file. The variant suffix is included
+# because the upstream lineage_gsi_arm64_{vN,vS,gN}.mk files are statically
+# variant-specific — to support a different variant (e.g. vS for superuser),
+# add a second wrapper inheriting the corresponding base. The default 64VN
+# = vanilla, no superuser, which is what microG users typically want.
+echo "  -> Writing lineage_gsi_arm64_vN_microg.mk ..."
+cat > "${VENDOR_DIR}/lineage_gsi_arm64_vN_microg.mk" <<'WRAPPER_MK'
+$(call inherit-product, device/lineage/gsi/lineage_gsi_arm64_vN.mk)
 $(call inherit-product, vendor/microg/microg.mk)
 
-PRODUCT_NAME := treble_arm64_microg
+PRODUCT_NAME := lineage_gsi_arm64_vN_microg
 WRAPPER_MK
 
 # ─── privapp-permissions XML ──────────────────────────────────────────────────

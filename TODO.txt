@@ -2,3 +2,5 @@ We should not hardcode each file into the generated Android.mk in step 20.
 Maybe use YAML to allow more complex and readable configuration that includes
 whether/how to sign it, etc.
 
+We should align on whether this pipeline is variant specific or variant agnostic.
+Currently pretends to be agnostic, but hardcodes certain things.
