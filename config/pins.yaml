@@ -54,3 +54,18 @@ pins:
     tracking_branch: pie
     category: frozen
     note: newer commits add device overlays only; advance only if you need them
+
+  # LineageOS branch tip drifted past the trailing context of AndyCGYan's
+  # 0002-Disable-ADB-authentication patch on config/common.mk. Pinned to the
+  # vendor_lineage HEAD as of Nov 19 2023 (contemporary with AndyCGYan's last
+  # patch refresh on lineage_patches_unified). This is the documented escape
+  # hatch from the tier doctrine above — adding a pin to an otherwise-tracked
+  # LineageOS project when its patches start failing.
+  - name: LineageOS/android_vendor_lineage
+    path: vendor/lineage
+    remote: github
+    revision: 142f7082c6d9e7c5f37a08e319283321dc6baf7d
+    upstream_url: https://github.com/LineageOS/android_vendor_lineage
+    tracking_branch: lineage-20.0
+    category: frozen
+    note: pinned to AndyCGYan patch-refresh era to keep Disable-ADB-authentication applicable; trades vendor_lineage updates for build stability
