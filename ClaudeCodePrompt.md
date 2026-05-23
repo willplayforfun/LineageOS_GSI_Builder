@@ -51,14 +51,16 @@ from the repository root. The script must:
 │   ├── 10-fetch-microg.sh             # Download microG / FLOSS APKs
 │   ├── 20-stage-vendor-microg.sh      # Write vendor/microg/{Android.mk,microg.mk}
 │   ├── 30-patch-treble-product.sh     # Hook microg.mk into device/phh/treble/lineage.mk
-│   ├── 40-generate-keys.sh            # AOSP key generation (idempotent)
+│   ├── 40-generate-keys.sh            # AOSP key generation into /srv/keys (idempotent)
+│   ├── 45-stage-vendor-keys.sh        # Build intermediate/lineage-priv, symlink into src
 │   ├── 50-build.sh                    # Drives the unified build script
 │   ├── 60-sign.sh                     # Sign target files, extract system.img
 │   └── 99-report.sh                   # Print final summary
 ├── config/
 │   ├── microg-apks.txt                # URL + sha256 list of APKs to fetch
 │   ├── cert-subject.txt               # X.509 subject line for key generation
-│   └── local_manifests/               # Any extra .xml local_manifests (initially empty)
+│   └── local_manifests/               # .xml files copied into .repo/local_manifests/ before sync
+│       └── andycgyan-unified.xml      # Declares lineage_build_unified + lineage_patches_unified
 └── .gitignore                         # Ignore src/, ccache/, out/, keys/
 ```
 
@@ -81,8 +83,8 @@ Responsibilities:
 
 1. Resolve `HOST_UID=$(id -u)` and `HOST_GID=$(id -g)`. Pass them as `--build-arg`s when running `docker build`, so the container's `builder` user matches the host user.
 2. `docker build` the image (tag: `lineage20-gsi-microg:latest`).
-3. Create `src/`, `ccache/`, `keys/`, `out/` directories if absent.
-4. `docker run --rm -it` the image, mounting those four dirs to `/srv/src`, `/srv/ccache`, `/srv/keys`, `/srv/out` respectively, calling `/opt/pipeline/entrypoint.sh`.
+3. Create `src/`, `ccache/`, `keys/`, `intermediate/`, `out/` directories if absent.
+4. `docker run --rm -it` the image, mounting all five dirs — `src` → `/srv/src`, `ccache` → `/srv/ccache`, `keys` → `/srv/keys`, `intermediate` → `/srv/intermediate`, `out` → `/srv/out` — then calling `/opt/pipeline/entrypoint.sh`.
 5. Accept these optional environment variables / CLI flags, with sensible defaults:
    - `NPROC` (default: `$(nproc)`)
    - `SKIP_SYNC=1` to skip `repo sync` (useful for iterating after the first sync)
@@ -105,14 +107,30 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 ### `00-prep-source.sh`
 
 - If `/srv/src/.repo` doesn't exist: `repo init -u https://github.com/LineageOS/android.git -b lineage-20.0 --git-lfs` in `/srv/src`.
-- Clone (or `git pull`) into `/srv/src/lineage_build_unified` from `https://github.com/AndyCGYan/lineage_build_unified` branch `lineage-20-light`.
-- Clone (or `git pull`) into `/srv/src/lineage_patches_unified` from `https://github.com/AndyCGYan/lineage_patches_unified` branch `lineage-20-light`.
-- Copy any `*.xml` files from `/opt/pipeline/config/local_manifests/` into `/srv/src/.repo/local_manifests/` (the dir must exist; create if missing).
+- Create `/srv/src/.repo/local_manifests/` if absent.
+- Copy every `*.xml` from `/opt/pipeline/config/local_manifests/` into `/srv/src/.repo/local_manifests/`. This includes the pre-committed `andycgyan-unified.xml` (see below), so `repo sync` handles `lineage_build_unified` and `lineage_patches_unified` as proper repo projects rather than ad-hoc git clones.
 - Unless `SKIP_SYNC=1`: `repo sync -j${NPROC} --force-sync --no-tags --no-clone-bundle --optimized-fetch`.
+
+`config/local_manifests/andycgyan-unified.xml` must be committed to the pipeline repo with the following contents (or equivalent):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="andycgyan" fetch="https://github.com/AndyCGYan" />
+  <project path="lineage_build_unified"   name="lineage_build_unified"
+           remote="andycgyan" revision="lineage-20-light" />
+  <project path="lineage_patches_unified" name="lineage_patches_unified"
+           remote="andycgyan" revision="lineage-20-light" />
+</manifest>
+```
+
+This is the correct way to include extra repos in a `repo`-managed tree. `repo sync --force-sync` will keep them up to date alongside the rest of the source; `repo status` will include them; and there is no need for separate `git clone` / `git pull` logic in the script.
 
 ### `10-fetch-microg.sh`
 
-Reads `/opt/pipeline/config/microg-apks.txt`. Each line is `<filename> <url> <sha256>`. For each entry, if `/srv/src/vendor/microg/prebuilts/<filename>` is absent or has wrong sha256, download and verify.
+Reads `/opt/pipeline/config/microg-apks.txt`. Each line is `<filename> <url> <sha256>`. For each entry, if `/srv/intermediate/vendor-microg/prebuilts/<filename>` is absent or has wrong sha256, download and verify into that path. Do **not** write directly into `/srv/src/` — step 20 creates the source-tree symlink.
+
+Create `/srv/intermediate/vendor-microg/prebuilts/` if absent before downloading.
 
 Initial contents of `microg-apks.txt` (verify URLs against the current state of the upstream repos before writing — the microG GmsCore project on GitHub publishes signed APKs on its Releases page, and F-Droid + Aurora publish through their own channels):
 
@@ -130,13 +148,36 @@ If any download URL is no longer valid at script-creation time, fall back to doc
 
 ### `20-stage-vendor-microg.sh`
 
-Creates `/srv/src/vendor/microg/Android.mk` and `/srv/src/vendor/microg/microg.mk`.
+Writes all generated `vendor/microg` content into `/srv/intermediate/vendor-microg/`, then exposes it to the source tree via a single symlink. Nothing is written directly into `/srv/src/vendor/microg/`.
 
-`Android.mk` declares four `BUILD_PREBUILT` modules: `GmsCore`, `Companion`, `FDroid`, `AuroraStore`. For `GmsCore` and `Companion`, use `LOCAL_CERTIFICATE := platform` (this is what makes microG's signature spoofing work cleanly — they get signed with the build's platform key, and LineageOS's framework grants spoof permission to platform-signed apps). For `FDroid` and `AuroraStore`, use `LOCAL_CERTIFICATE := PRESIGNED` (keep the upstream developer signatures intact). All four are `LOCAL_PRIVILEGED_MODULE := true` and `LOCAL_PRODUCT_MODULE := true`.
+Specifically, the script generates these files under `/srv/intermediate/vendor-microg/`:
 
-`microg.mk` adds those four modules to `PRODUCT_PACKAGES` and grants the `FAKE_PACKAGE_SIGNATURE` permission to `com.google.android.gms` via `PRODUCT_COPY_FILES` of a privapp-permissions XML. Create that XML inline in the script and ship it under `/srv/src/vendor/microg/permissions/privapp-permissions-com.google.android.gms.xml`.
+- `Android.mk` — declares four `BUILD_PREBUILT` modules: `GmsCore`, `Companion`, `FDroid`, `AuroraStore`. For `GmsCore` and `Companion`, use `LOCAL_CERTIFICATE := platform` (this is what makes microG's signature spoofing work cleanly — they get signed with the build's platform key, and LineageOS's framework grants spoof permission to platform-signed apps). For `FDroid` and `AuroraStore`, use `LOCAL_CERTIFICATE := PRESIGNED` (keep the upstream developer signatures intact). All four are `LOCAL_PRIVILEGED_MODULE := true` and `LOCAL_PRODUCT_MODULE := true`. Each module's `LOCAL_SRC_FILES` points to `prebuilts/<filename>`, which is populated by step 10.
+- `microg.mk` — adds those four modules to `PRODUCT_PACKAGES` and grants the `FAKE_PACKAGE_SIGNATURE` permission to `com.google.android.gms` via `PRODUCT_COPY_FILES` of a privapp-permissions XML.
+- `permissions/privapp-permissions-com.google.android.gms.xml` — created inline in the script.
+- `prebuilts/` — this subdirectory is already populated by step 10; the script must not clobber it, only ensure it exists.
+
+After writing those files, the script creates the source-tree symlink idempotently:
+
+```bash
+ln -sfn /srv/intermediate/vendor-microg /srv/src/vendor/microg
+```
+
+Use `ln -sfn` so re-runs don't fail if the symlink already exists.
 
 ### `30-patch-treble-product.sh`
+
+> **⚠ Design note — choose an approach before implementing**
+>
+> The goal of this step is to ensure `vendor/microg/microg.mk` is included in the product build. The naïve implementation below achieves this by patching `device/phh/treble/lineage.mk` at runtime, but that file is itself the *output* of `generate.sh` (a repo-managed script) — so we are modifying a generated artefact that will be regenerated by `buildbot_unified.sh` in step 50, requiring the patch to be re-applied there too. This is fragile. Three cleaner alternatives exist; pick one before writing the script:
+>
+> **Option A — `AndroidProducts.mk` wrapper in `vendor/microg/` (recommended).** The Android build system auto-discovers `AndroidProducts.mk` in every `vendor/` subdirectory during `source build/envsetup.sh`. Add `vendor/microg/AndroidProducts.mk` declaring a thin wrapper product (e.g. `treble_arm64_bvN_microg`) whose makefile inherits both `device/phh/treble/lineage.mk` and `vendor/microg/microg.mk`. Step 30 disappears; step 50 changes to: run `generate.sh` first, then `lunch` on the wrapper target, then `make`. No repo-managed file is ever touched. The cost is that step 50 must own the `generate.sh → lunch → make` sequence explicitly rather than delegating it wholesale to `buildbot_unified.sh`.
+>
+> **Option B — `PRODUCT_PACKAGES+=` on the `make` command line.** `vendor/microg/Android.mk` is already auto-discovered by the build system; the only missing piece is getting the modules into `PRODUCT_PACKAGES` for the final image. Pass `PRODUCT_PACKAGES+="GmsCore Companion FDroid AuroraStore"` as a make variable override when invoking `make` in step 50. No lunch-target rename and no file modification needed. Less battle-tested than makefile inheritance and requires wrapping or replacing the `make` invocation inside `buildbot_unified.sh`.
+>
+> **Option C — Patch `generate.sh`, not its output.** Apply a `git format-patch`-style patch to `generate.sh` itself (the repo-managed script that produces `lineage.mk`), so the `$(call inherit-product, vendor/microg/microg.mk)` line is emitted as part of normal generation. Delivered via the same patch-application mechanism that `lineage_patches_unified` already uses, making it tracked and reviewable. Still modifies a repo-managed file, so it doesn't fully eliminate that class of problem, but it does it once and formally rather than re-running `sed` against a generated file every build.
+
+This script patches an existing file in the source tree rather than generating a new one, so there is no intermediate artifact to manage — the sentinel file (`/srv/intermediate/.stage-30-done`) is still written there as usual.
 
 This runs **after** the unified build script's `generate.sh` (so the file exists), but **before** the actual `make` invocation. Easiest implementation: don't try to interleave — instead, prepend an `$(call inherit-product, vendor/microg/microg.mk)` line to `/srv/src/device/phh/treble/lineage.mk` using `grep -q` to check for an existing line and `sed -i` to add it idempotently.
 
@@ -146,7 +187,7 @@ Document the chosen approach in a comment at the top of the file.
 
 ### `40-generate-keys.sh`
 
-Idempotent. If `/srv/keys/releasekey.pk8` exists, skip and announce "reusing existing keys from /srv/keys".
+Idempotent. If `/srv/keys/releasekey.pk8` exists, skip and announce "reusing existing keys from /srv/keys" — do nothing else. Key material is the only concern of this script; staging into the source tree is handled by step 45.
 
 Otherwise generate the full LineageOS 20 key set. From the LineageOS wiki — the canonical list of certs needed for a lineage-20 build is:
 
@@ -154,13 +195,26 @@ Otherwise generate the full LineageOS 20 key set. From the LineageOS wiki — th
 bluetooth cyngn-app media networkstack nfc platform releasekey sdk_sandbox shared testcert testkey verity
 ```
 
-For each, run `./development/tools/make_key /srv/keys/<cert> "$SUBJECT"` from `/srv/src/`, where `$SUBJECT` comes from `/opt/pipeline/config/cert-subject.txt`. Press Enter twice (empty passphrase) for each — implement this via `expect`, or by piping `"\n\n"`, or by running `make_key` with `</dev/null` after editing it to default to no password. (`make_key` reads the password interactively; the standard workaround is `( \\n\\n ) | ./development/tools/make_key ...`.)
+For each, run `./development/tools/make_key /srv/keys/<cert> "$SUBJECT"` from `/srv/src/`, where `$SUBJECT` comes from `/opt/pipeline/config/cert-subject.txt`. Press Enter twice (empty passphrase) for each — implement this via `expect`, or by piping `"\n\n"`, or by running `make_key` with `</dev/null` after editing it to default to no password. (`make_key` reads the password interactively; the standard workaround is `( \n\n ) | ./development/tools/make_key ...`.)
 
 LineageOS 19.1+ also requires APEX keys to be 4096-bit instead of the default 2048-bit. After generating the standard set, create a copy of `make_key` with `sed -i 's|2048|4096|g'` and use it to generate APEX-specific keys if the unified build calls for them. Check the build output — if it fails on missing APEX keys, the user can re-run with a flag to regenerate. For a first version, generate the standard 11 keys above; flag APEX as a known follow-up in README.
 
-After generation, symlink (or copy) `/srv/keys` into `/srv/src/vendor/lineage-priv/keys/` so the build system finds them. (`vendor/lineage-priv/keys/` is the LineageOS-conventional location.)
+### `45-stage-vendor-keys.sh`
 
-Also create `/srv/src/vendor/lineage-priv/keys/Android.mk` and `keys.mk` declaring the keys — the LineageOS wiki and the gist linked in research show the canonical contents. Generate these files if missing.
+Sets up the `vendor/lineage-priv/keys/` path that the build system expects, using `/srv/intermediate/lineage-priv/` as the staging area. This script always runs in full (no early-exit sentinel), because the intermediate directory may have been wiped by `CLEAN=1` even when `/srv/keys/` still contains valid keys.
+
+Steps:
+
+1. Create `/srv/intermediate/lineage-priv/` if absent.
+2. Write `Android.mk` and `keys.mk` into `/srv/intermediate/lineage-priv/` if they don't already exist. The LineageOS wiki and the canonical gist show their contents; these files declare the key set for the build system.
+3. For each `*.pk8` and `*.x509.pem` in `/srv/keys/`, create a symlink `ln -sf /srv/keys/<file> /srv/intermediate/lineage-priv/<file>` if it doesn't already exist. This keeps private key material exclusively in the host-mounted `/srv/keys/` volume.
+4. Symlink the staging directory into the source tree idempotently:
+   ```bash
+   mkdir -p /srv/src/vendor/lineage-priv
+   ln -sfn /srv/intermediate/lineage-priv /srv/src/vendor/lineage-priv/keys
+   ```
+
+The result: `/srv/src/vendor/lineage-priv/keys/` resolves to `/srv/intermediate/lineage-priv/`, which contains the generated `Android.mk`/`keys.mk` plus per-file symlinks back into `/srv/keys/`. Private key material never leaves `/srv/keys/`.
 
 ### `50-build.sh`
 
