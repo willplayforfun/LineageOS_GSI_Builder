@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Workaround for an upstream lineage-20.0 duplicate-module conflict.
+
+  Both vendor/lineage/prebuilt/common (legacy make) and vendor/apn
+  (modern prebuilt_etc_xml with schema validation) define a Soong/Make
+  module named "apns-conf.xml", which causes:
+
+      base_rules.mk:338: error: vendor/lineage/prebuilt/common:
+      MODULE.TARGET.ETC.apns-conf.xml already defined by vendor/apn.
+
+  vendor/apn was meant to take over hosting but the entry in vendor/lineage
+  was never removed upstream. Drop vendor/apn here: telephony.mk /
+  data_only.mk still list apns-conf.xml in PRODUCT_PACKAGES, and the
+  vendor/lineage prebuilt continues to satisfy it.
+
+  Filename prefix `zz-` is load-bearing — repo processes local_manifests/
+  alphabetically and <remove-project> requires the target to already be
+  declared by an earlier file (here, the default lineage-20.0 manifest).
+-->
+<manifest>
+  <remove-project name="LineageOS/android_vendor_apn" />
+</manifest>
