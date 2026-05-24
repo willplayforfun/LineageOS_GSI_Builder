@@ -76,15 +76,21 @@ fi
 # vendor/microg/microg.mk on top. See scripts/20-stage-vendor-microg.sh.
 echo "  -> Lunching ${LUNCH_TARGET} ..."
 lunch "${LUNCH_TARGET}"
-IFS="$_saved_ifs"
-set -u  # restore nounset + IFS now that envsetup + lunch are done
 
 # ─── Build ──────────────────────────────────────────────────────────────────
 # `target-files-package` produces the unsigned target-files zip (consumed by
 # steps 55 and 60); `otatools` populates out/host/linux-x86/bin/ with
 # sign_target_files_apks (used by step 60). `make` is incremental, so re-runs
 # only rebuild what changed.
+#
+# Note: `make` here is the bash function defined by envsetup.sh, not /usr/bin/make.
+# It internally word-splits `$(get_make_command)` into `build/soong/soong_ui.bash
+# --make-mode`, so it needs default IFS too — keep the relaxed shell through this
+# call. Restored at the end for hygiene; nothing in this script runs after.
 echo "  -> make -j${NPROC} target-files-package otatools ..."
 make -j"${NPROC}" target-files-package otatools
+
+IFS="$_saved_ifs"
+set -u  # restore nounset + IFS now that envsetup + lunch + make are done
 
 echo "==> [50] Done."
