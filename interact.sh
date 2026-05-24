@@ -57,23 +57,29 @@ else
     docker_flags+=(-i)
 fi
 
+# We bypass /usr/local/bin/fix-perms-entrypoint.sh because it hardcodes
+# `exec runuser -u builder -- /opt/pipeline/entrypoint.sh "$@"`, which would
+# just launch the build pipeline. Instead, run the container as root with bash
+# as the entrypoint and do the chown + runuser inline, exec'ing our cmd[@] at
+# the end.
+
 if [[ "${ROOT}" == "1" ]]; then
-    # Root shell — skips fix-perms-entrypoint.sh's chown step. Handy for quickly
-    # inspecting things without waiting for chown -R /srv on a large tree.
+    # Root shell — skip chown. Fast in, no ownership pass over /srv.
     echo "==> Entering container as root (no chown) ..."
     exec docker run "${docker_flags[@]}" "${mounts[@]}" \
         --entrypoint /bin/bash \
         -u 0 \
+        -w /srv/src \
         "${IMAGE}" \
-        -c 'cd /srv/src 2>/dev/null || cd /; exec "$@"' -- "${cmd[@]}"
+        -c 'exec "$@"' -- "${cmd[@]}"
 fi
 
-# Default path: go through fix-perms-entrypoint.sh so /srv ownership is sane,
-# then drop to the builder user. The entrypoint does
-# `exec runuser -u builder -- "$@"` ([docker/fix-perms-entrypoint.sh:8]), so
-# our cmd[@] becomes what builder runs.
+# Default path: enter as root, chown /srv (mirroring fix-perms-entrypoint.sh),
+# then drop to builder via runuser and exec the requested command.
 echo "==> Entering container as builder (chowning /srv first — may take a moment) ..."
 exec docker run "${docker_flags[@]}" "${mounts[@]}" \
-    --entrypoint /usr/local/bin/fix-perms-entrypoint.sh \
+    --entrypoint /bin/bash \
+    -u 0 \
     "${IMAGE}" \
-    "${cmd[@]}"
+    -c 'chown -R builder:builder /srv && cd /srv/src && exec runuser -u builder -- "$@"' \
+    -- "${cmd[@]}"
