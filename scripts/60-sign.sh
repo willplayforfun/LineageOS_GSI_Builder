@@ -92,7 +92,18 @@ echo "  -> APEX-APK flags built for ${#APEX_APKS[@]} APK(s)."
 # ─── Sign ────────────────────────────────────────────────────────────────────
 mkdir -p "$(dirname "${SIGNED_TF}")"
 echo "  -> Signing target files → ${SIGNED_TF} ..."
-"${SIGN_TOOL}" -o -d "${KEYS_DIR}" "${FLAGS[@]}" "${TF_ZIP}" "${SIGNED_TF}"
+# --allow_gsi_debug_sepolicy: the upstream GSI product makefile
+# (device/lineage/gsi/lineage_gsi_arm64_vN.mk) sets SELINUX_IGNORE_NEVERALLOWS
+# and PRODUCT_INSTALL_DEBUG_POLICY_TO_SYSTEM_EXT unconditionally — both are
+# required for a GSI that must run on arbitrary vendor implementations and are
+# incompatible with the -user build variant. The GSI is therefore built as
+# -userdebug, which produces userdebug_plat_sepolicy.cil. This flag tells the
+# signing tool to accept that file rather than hard-erroring on it.
+"${SIGN_TOOL}" \
+    --allow_gsi_debug_sepolicy \
+    -o -d "${KEYS_DIR}" \
+    "${FLAGS[@]}" \
+    "${TF_ZIP}" "${SIGNED_TF}"
 
 # ─── Extract system.img ──────────────────────────────────────────────────────
 # The signed zip stores the final system image at IMAGES/system.img. Pipe

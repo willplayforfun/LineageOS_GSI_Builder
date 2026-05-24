@@ -29,13 +29,41 @@ SKIP_SYNC="${SKIP_SYNC:-0}"
 
 cd "${SRC_DIR}"
 
-# Shared sync invocation. With SKIP_SYNC=1 we drop to `repo sync -l` (local-
-# only, no fetch) rather than skipping entirely — this still checks out each
-# project at its manifest revision, which is what undoes the previous run's
-# patch commits and gives apply_patches.sh a clean base to work from. A true
-# skip would leave projects post-patch and break idempotency of step 50.
+# Shared with 50-build.sh: records the lineage_patches_unified HEAD SHA after
+# a successful apply. See the patch-state guard below.
+PATCHES_APPLIED_FILE="/srv/intermediate/.patches-applied"
+
+# Shared sync invocation.
+#
+# With SKIP_SYNC=1 the normal path is `repo sync -l --force-sync`, which checks
+# out every project at its manifest revision. This undoes the previous run's
+# patch commits and resets mtime on all patched source files — causing Soong to
+# recompile every patched module even when nothing changed.
+#
+# To avoid that, we check whether patches are already applied (same
+# lineage_patches_unified HEAD as recorded by 50-build.sh). If they are, we
+# skip the local checkout entirely: the tree is already in the correct
+# post-patch state, so there is nothing for repo or apply_patches.sh to do.
+#
+# This guard only applies to SKIP_SYNC=1. A network sync (SKIP_SYNC=0) always
+# resets the tree because upstream repos may have moved; patches must be
+# reapplied fresh afterward.
+_SKIP_TREE_RESET=0
+if [[ "${SKIP_SYNC}" == "1" && -d "${SRC_DIR}/lineage_patches_unified/.git" ]]; then
+    _patches_head=$(git -C "${SRC_DIR}/lineage_patches_unified" rev-parse HEAD 2>/dev/null || echo "")
+    _applied_hash=$(cat "${PATCHES_APPLIED_FILE}" 2>/dev/null || echo "")
+    if [[ -n "${_patches_head}" && "${_patches_head}" == "${_applied_hash}" ]]; then
+        echo "  -> Patch set unchanged (${_patches_head:0:12}…) — tree reset will be skipped."
+        _SKIP_TREE_RESET=1
+    fi
+fi
+
 run_repo_sync() {
     if [[ "${SKIP_SYNC}" == "1" ]]; then
+        if [[ "${_SKIP_TREE_RESET}" == "1" ]]; then
+            echo "  -> SKIP_SYNC=1 + patches up-to-date: skipping repo sync -l."
+            return 0
+        fi
         repo sync -l --force-sync
     else
         repo sync \

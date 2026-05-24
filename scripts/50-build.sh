@@ -9,8 +9,11 @@ IFS=$'\n\t'
 SRC_DIR="/srv/src"
 PATCHES_SCRIPT="${SRC_DIR}/lineage_build_unified/apply_patches.sh"
 PATCHES_DIR="${SRC_DIR}/lineage_patches_unified"
-LUNCH_TARGET="lineage_gsi_arm64_vN_microg-user"
+LUNCH_TARGET="lineage_gsi_arm64_vN_microg-userdebug"
 NPROC="${NPROC:-$(nproc)}"
+# Shared with 00-prep-source.sh: records the lineage_patches_unified HEAD SHA
+# after a successful apply. Both scripts check this to avoid redundant resets.
+PATCHES_APPLIED_FILE="/srv/intermediate/.patches-applied"
 
 echo "==> [50] Building target-files-package + otatools"
 
@@ -30,17 +33,32 @@ do
     fi
 done
 
-# ─── Apply patches ──────────────────────────────────────────────────────────
-# apply_patches.sh from lineage_build_unified runs `git clean -fdx && git reset
-# --hard` on each project before re-applying its patch set, so it's safe to
-# re-run on every build. This is the same flow buildbot_unified.sh uses; we
-# lift the two patch groups (platform + treble) and skip its repo-sync block
-# since step 00 already handled sync.
-echo "  -> Applying patches_platform ..."
-bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_platform"
+# ─── Apply patches (with state caching) ─────────────────────────────────────
+# apply_patches.sh runs `git clean -fdx && git reset --hard` on each patched
+# project before re-applying — necessary for idempotency, but it resets mtime
+# on every patched source file, causing Soong to recompile those modules even
+# when nothing actually changed.
+#
+# To avoid this, we track the HEAD SHA of lineage_patches_unified. When the
+# SHA matches the last recorded apply, the patch set is identical to what is
+# already in the tree (step 00 skipped the repo sync -l reset too), so we can
+# skip the whole reset+reapply cycle and preserve the source mtimes that
+# Soong's incremental build depends on.
+_current_patches_head=$(git -C "${PATCHES_DIR}" rev-parse HEAD 2>/dev/null || echo "")
+_applied_hash=$(cat "${PATCHES_APPLIED_FILE}" 2>/dev/null || echo "")
 
-echo "  -> Applying patches_treble ..."
-bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_treble"
+if [[ -n "${_current_patches_head}" && "${_current_patches_head}" == "${_applied_hash}" ]]; then
+    echo "  -> Patch set unchanged (${_current_patches_head:0:12}…) — skipping reset and re-apply."
+else
+    echo "  -> Applying patches_platform ..."
+    bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_platform"
+
+    echo "  -> Applying patches_treble ..."
+    bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_treble"
+
+    # Record the applied SHA so the next run can detect an unchanged patch set.
+    echo "${_current_patches_head}" > "${PATCHES_APPLIED_FILE}"
+fi
 
 # ─── Source envsetup ────────────────────────────────────────────────────────
 # Sourced after patches in case any patch modifies envsetup itself.
@@ -87,6 +105,11 @@ lunch "${LUNCH_TARGET}"
 # It internally word-splits `$(get_make_command)` into `build/soong/soong_ui.bash
 # --make-mode`, so it needs default IFS too — keep the relaxed shell through this
 # call. Restored at the end for hygiene; nothing in this script runs after.
+# Size the persistent ccache volume. Android 13 generates 30-50 GB of ccache
+# data; the default 5 GB limit causes constant eviction and near-zero hit rates.
+# Calling -M on every run is safe — it is a fast metadata write and idempotent.
+"${CCACHE_EXEC}" -M 50G
+
 echo "  -> make -j${NPROC} target-files-package otatools ..."
 make -j"${NPROC}" target-files-package otatools
 
