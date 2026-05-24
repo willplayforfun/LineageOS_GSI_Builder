@@ -45,13 +45,16 @@ bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_treble"
 # ─── Source envsetup ────────────────────────────────────────────────────────
 # Sourced after patches in case any patch modifies envsetup itself.
 #
-# AOSP's envsetup.sh references variables like TOP and ZSH_VERSION without
-# guards, on the assumption it's sourced in a relaxed shell. Our `set -u`
-# (nounset) treats those as fatal errors, so disable nounset for the duration
-# of the source — and lunch, which also reads back into envsetup's helpers.
-# Restore it afterwards so the rest of the script keeps its safety net.
+# AOSP's envsetup.sh assumes a relaxed shell: it references variables like TOP
+# and ZSH_VERSION without guards (fatal under `set -u`), and it relies on
+# default IFS to word-split space-joined variable lists into separate args for
+# `unset` (with our `IFS=$'\n\t'`, the whole blob becomes one token and bash
+# rejects it as "not a valid identifier"). Relax both for the source + lunch
+# block, then restore the script's safety net.
 echo "  -> Sourcing build/envsetup.sh ..."
+_saved_ifs="$IFS"
 set +u
+IFS=$' \t\n'
 # shellcheck disable=SC1091
 source build/envsetup.sh
 
@@ -73,7 +76,8 @@ fi
 # vendor/microg/microg.mk on top. See scripts/20-stage-vendor-microg.sh.
 echo "  -> Lunching ${LUNCH_TARGET} ..."
 lunch "${LUNCH_TARGET}"
-set -u  # restore nounset now that envsetup + lunch are done
+IFS="$_saved_ifs"
+set -u  # restore nounset + IFS now that envsetup + lunch are done
 
 # ─── Build ──────────────────────────────────────────────────────────────────
 # `target-files-package` produces the unsigned target-files zip (consumed by
