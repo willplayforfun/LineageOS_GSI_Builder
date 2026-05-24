@@ -62,8 +62,8 @@ PRODUCT_MAKEFILES := \
     $(LOCAL_DIR)/lineage_gsi_arm64_vN_microg.mk
 
 COMMON_LUNCH_CHOICES := \
-    lineage_gsi_arm64_vN_microg-userdebug \
     lineage_gsi_arm64_vN_microg-user \
+    lineage_gsi_arm64_vN_microg-userdebug \
     lineage_gsi_arm64_vN_microg-eng
 ANDROID_PRODUCTS_MK
 

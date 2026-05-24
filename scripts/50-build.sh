@@ -9,7 +9,7 @@ IFS=$'\n\t'
 SRC_DIR="/srv/src"
 PATCHES_SCRIPT="${SRC_DIR}/lineage_build_unified/apply_patches.sh"
 PATCHES_DIR="${SRC_DIR}/lineage_patches_unified"
-LUNCH_TARGET="lineage_gsi_arm64_vN_microg-userdebug"
+LUNCH_TARGET="lineage_gsi_arm64_vN_microg-user"
 NPROC="${NPROC:-$(nproc)}"
 
 echo "==> [50] Building target-files-package + otatools"
