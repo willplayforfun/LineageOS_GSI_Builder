@@ -52,12 +52,16 @@ RUN apt-get update \
        openjdk-11-jdk \
     && rm -rf /var/lib/apt/lists/*
 
+# ncurses:
 # clang-3289846 is an old binary linked against ncurses 5. 
 # Ubuntu 20.04 ships ncurses 6 by default; the .so.5 ABI lives in separate compat packages. 
 # Ubuntu 20.04 dropped them from its baseline minimal install.
+# unzip:
+# guice_munge_manifest step needs to unzip a JAR
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        libncurses5 \
+       unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Pipeline-specific tooling — packages this pipeline needs beyond the
