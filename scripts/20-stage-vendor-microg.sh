@@ -1,27 +1,44 @@
 #!/usr/bin/env bash
-# Purpose: Generate vendor/microg build files (incl. an AndroidProducts.mk
-# wrapper product `lineage_gsi_arm64_vN_microg`) in the intermediate area and
-# symlink into the source tree.
+# Purpose: Generate vendor/microg build files DIRECTLY in the source tree as
+# real files (Soong's module finder skips symlinked directories, so the old
+# "symlink vendor/microg → intermediate" approach made AndroidProducts.mk
+# invisible to product discovery). Only prebuilts/ remains a symlink, because
+# its contents are looked up by make's file resolver — not Soong's finder —
+# and that does follow symlinks.
 
 set -euo pipefail
 IFS=$'\n\t'
 
-VENDOR_DIR="/srv/intermediate/vendor-microg"
-SRC_LINK="/srv/src/vendor/microg"
-# Array, not a string — we run with `IFS=$'\n\t'` (no space), so word-splitting
-# on a string variable would not produce separate argv elements.
+INTERMEDIATE_DIR="/srv/intermediate/vendor-microg"
+VENDOR_DIR="/srv/src/vendor/microg"
 APKS_TOOL=(python3 /opt/pipeline/scripts/apks-tool.py)
 
 echo "==> [20] Staging vendor/microg"
 
 # All work below is cheap and idempotent (clobbering writes + ln -sfn), so we
-# rerun it every invocation rather than gating on a sentinel — that keeps the
-# staged content in lockstep with whatever this script currently emits, even
-# if it has changed since a previous run.
+# rerun it every invocation rather than gating on a sentinel — keeps the
+# staged content in lockstep with what this script currently emits.
 
-# Ensure the prebuilts dir exists but never clobber APKs placed there by step 10.
-mkdir -p "${VENDOR_DIR}/prebuilts"
-mkdir -p "${VENDOR_DIR}/permissions"
+# Step 10's downloaded APKs live in the intermediate area, persisted across
+# CLEAN=1 wipes only via the symlink below. Ensure it exists either way.
+mkdir -p "${INTERMEDIATE_DIR}/prebuilts"
+
+# One-time migration: previous iterations of this script symlinked
+# vendor/microg → intermediate/vendor-microg. Soong's finder doesn't traverse
+# symlinked directories, so we now want a real directory here. Remove any
+# legacy symlink before creating the real dir.
+if [[ -L "${VENDOR_DIR}" ]]; then
+    rm "${VENDOR_DIR}"
+fi
+mkdir -p "${VENDOR_DIR}" "${VENDOR_DIR}/permissions"
+
+# ─── prebuilts symlink ───────────────────────────────────────────────────────
+# vendor/microg/prebuilts/<file>.apk is referenced by Android.mk's
+# BUILD_PREBUILT LOCAL_SRC_FILES — a path lookup that follows symlinks
+# transparently. Linking the directory (rather than copying) keeps step 10's
+# downloads under /srv/intermediate (so a source-tree wipe doesn't waste a
+# fresh download). ln -sfn replaces any existing link without failing.
+ln -sfn "${INTERMEDIATE_DIR}/prebuilts" "${VENDOR_DIR}/prebuilts"
 
 # ─── Android.mk + microg.mk (generated from config/microg-apks.yaml) ─────────
 # Both files are derived from the same YAML source; apks-tool emits the full
@@ -34,7 +51,7 @@ echo "  -> Generating microg.mk from microg-apks.yaml ..."
 "${APKS_TOOL[@]}" generate-microg-mk > "${VENDOR_DIR}/microg.mk"
 
 # ─── AndroidProducts.mk ──────────────────────────────────────────────────────
-# Auto-discovered by build/envsetup.sh under any vendor/*. Declaring the
+# Discovered by Soong's module finder under any vendor/*. Declaring the
 # wrapper product here is what makes `lunch lineage_gsi_arm64_vN_microg-userdebug`
 # resolvable without modifying any repo-managed file. Per AOSP convention this
 # file must only reference $(LOCAL_DIR) (which the build system pre-sets to the
@@ -52,12 +69,10 @@ ANDROID_PRODUCTS_MK
 
 # ─── lineage_gsi_arm64_vN_microg.mk (wrapper product) ────────────────────────
 # Inherits AndyCGYan's per-variant lineage GSI product makefile and layers
-# vendor/microg/microg.mk on top, so a single lunch target produces a microG
-# GSI without touching any repo-managed file. The variant suffix is included
+# vendor/microg/microg.mk on top. The variant suffix is part of the name
 # because the upstream lineage_gsi_arm64_{vN,vS,gN}.mk files are statically
-# variant-specific — to support a different variant (e.g. vS for superuser),
-# add a second wrapper inheriting the corresponding base. The default 64VN
-# = vanilla, no superuser, which is what microG users typically want.
+# variant-specific — to support a different variant later, add a second
+# wrapper inheriting the corresponding base.
 echo "  -> Writing lineage_gsi_arm64_vN_microg.mk ..."
 cat > "${VENDOR_DIR}/lineage_gsi_arm64_vN_microg.mk" <<'WRAPPER_MK'
 $(call inherit-product, device/lineage/gsi/lineage_gsi_arm64_vN.mk)
@@ -80,10 +95,5 @@ cat > "${VENDOR_DIR}/permissions/privapp-permissions-com.google.android.gms.xml"
     </privapp-permissions>
 </permissions>
 PERMS_XML
-
-# ─── Symlink into source tree ─────────────────────────────────────────────────
-# ln -sfn overwrites an existing symlink without failing, making this idempotent.
-echo "  -> Symlinking ${VENDOR_DIR} → ${SRC_LINK} ..."
-ln -sfn "${VENDOR_DIR}" "${SRC_LINK}"
 
 echo "==> [20] Done."

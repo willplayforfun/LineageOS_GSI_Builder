@@ -55,27 +55,16 @@ set +u
 # shellcheck disable=SC1091
 source build/envsetup.sh
 
-# ─── Pre-lunch diagnostic ───────────────────────────────────────────────────
-# If lunch later fails with "Can not locate config makefile for product",
-# the usual cause is that our vendor/microg AndroidProducts.mk isn't visible
-# to the build system's product-discovery glob. Print the relevant
-# filesystem state so we can see what's actually on disk and what find
-# resolves through the symlink. Safe to remove once the build is stable.
-echo "  -> Diagnostic: vendor/microg directory entry ..."
-ls -la vendor/microg 2>&1 | sed 's/^/       /'
-echo "  -> Diagnostic: AndroidProducts.mk files visible to product discovery ..."
-find -L vendor -maxdepth 6 -name AndroidProducts.mk 2>&1 | sed 's/^/       /'
-if [[ -f vendor/microg/AndroidProducts.mk ]]; then
-    echo "  -> Diagnostic: vendor/microg/AndroidProducts.mk content ..."
-    sed 's/^/       /' vendor/microg/AndroidProducts.mk
-else
-    echo "  -> Diagnostic: vendor/microg/AndroidProducts.mk NOT REACHABLE"
-fi
-if [[ -f vendor/microg/lineage_gsi_arm64_vN_microg.mk ]]; then
-    echo "  -> Diagnostic: lineage_gsi_arm64_vN_microg.mk content ..."
-    sed 's/^/       /' vendor/microg/lineage_gsi_arm64_vN_microg.mk
-else
-    echo "  -> Diagnostic: lineage_gsi_arm64_vN_microg.mk NOT REACHABLE"
+# ─── Invalidate Soong's module-path cache ───────────────────────────────────
+# Lineage-20 (Android 13) doesn't run `find` for AndroidProducts.mk at lunch
+# time — it reads a pre-generated list from out/.module_paths/, populated by
+# Soong's finder on previous builds. If vendor/microg wasn't present (or was
+# a symlinked directory the finder skipped) during that earlier scan, the
+# cache won't include our wrapper and lunch will fail to locate the product.
+# Nuking the cache forces a fresh scan on the next make invocation.
+if [[ -d out/.module_paths ]]; then
+    echo "  -> Clearing Soong module-path cache to force re-scan ..."
+    rm -rf out/.module_paths
 fi
 
 # ─── Lunch the microG wrapper product ───────────────────────────────────────
