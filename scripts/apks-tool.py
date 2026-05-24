@@ -69,6 +69,10 @@ def cmd_generate_android_mk():
         print(f"LOCAL_CERTIFICATE        := {apk['certificate']}")
         if apk.get("privileged"):
             print("LOCAL_PRIVILEGED_MODULE  := true")
+        if apk.get("uses_libs"):
+            print("LOCAL_USES_LIBRARIES     := " + " ".join(apk["uses_libs"]))
+        if apk.get("optional_uses_libs"):
+            print("LOCAL_OPTIONAL_USES_LIBRARIES := " + " ".join(apk["optional_uses_libs"]))
         print("LOCAL_PRODUCT_MODULE     := true")
         print("include $(BUILD_PREBUILT)")
 

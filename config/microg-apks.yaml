@@ -29,6 +29,12 @@ apks:
     certificate: platform
     privileged: true
     note: signed with platform key so the framework grants FAKE_PACKAGE_SIGNATURE
+    uses_libs:
+      - com.android.location.provider
+    optional_uses_libs:
+      - org.apache.http.legacy
+      - androidx.window.extensions
+      - androidx.window.sidecar
 
   - module: Companion
     filename: Companion.apk
@@ -37,6 +43,9 @@ apks:
     certificate: platform
     privileged: true
     note: microG FakeStore — also needs platform cert for signature spoofing
+    optional_uses_libs:
+      - androidx.window.extensions
+      - androidx.window.sidecar
 
   - module: FDroid
     filename: FDroid.apk
@@ -45,6 +54,9 @@ apks:
     certificate: PRESIGNED
     privileged: true
     note: keep upstream developer signature for self-update + signed-repo verification
+    optional_uses_libs:
+      - androidx.window.extensions
+      - androidx.window.sidecar
 
   - module: AuroraStore
     filename: AuroraStore.apk
@@ -53,3 +65,6 @@ apks:
     certificate: PRESIGNED
     privileged: true
     note: keep upstream developer signature
+    optional_uses_libs:
+      - androidx.window.extensions
+      - androidx.window.sidecar
