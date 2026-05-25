@@ -52,7 +52,7 @@ if [[ -f "${VBMETA}" ]]; then
     echo "  vbmeta size: ${VBMETA_SIZE}"
     echo "  SHA256     : ${VBMETA_SHA256}"
 else
-    echo "  vbmeta.img : not present  (produced by step 65 on a full build)"
+    echo "  vbmeta.img : not present  (produced by step 60 on a full build)"
 fi
 
 echo ""

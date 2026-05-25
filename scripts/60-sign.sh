@@ -105,12 +105,21 @@ echo "  -> Signing target files → ${SIGNED_TF} ..."
     "${FLAGS[@]}" \
     "${TF_ZIP}" "${SIGNED_TF}"
 
-# ─── Extract system.img ──────────────────────────────────────────────────────
-# The signed zip stores the final system image at IMAGES/system.img. Pipe
-# straight to the output volume so we don't materialise an intermediate copy.
+# ─── Extract images ──────────────────────────────────────────────────────────
+# Pipe straight from the signed zip to the output volume so we don't
+# materialise intermediate copies.
 mkdir -p "${OUT_DIR}"
 echo "  -> Extracting IMAGES/system.img → ${OUT_DIR}/system.img ..."
 unzip -p "${SIGNED_TF}" IMAGES/system.img > "${OUT_DIR}/system.img"
+
+# vbmeta.img is produced by sign_target_files_apks: it contains the AVB digest
+# of the signed system partition and is the correct image to flash alongside
+# system.img. Flash it with:
+#   fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img
+# The fastboot flags set the HASHTREE_DISABLED + VERIFICATION_DISABLED bits in
+# the image at flash time, disabling AVB without discarding the correct structure.
+echo "  -> Extracting IMAGES/vbmeta.img → ${OUT_DIR}/vbmeta.img ..."
+unzip -p "${SIGNED_TF}" IMAGES/vbmeta.img > "${OUT_DIR}/vbmeta.img"
 
 # ─── Publish public certs ───────────────────────────────────────────────────
 # Public .x509.pem only — private .pk8 files stay in /srv/keys/ exclusively so
