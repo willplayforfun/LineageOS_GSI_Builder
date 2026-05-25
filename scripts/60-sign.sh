@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Purpose: Sign the unsigned target-files zip with our releasekey (incl. all
-# APEX modules discovered by step 55), extract system.img, and publish the
-# public certs into /srv/out.
+# APEX modules discovered by step 55). Image extraction and cert publishing
+# happen in step 62 so that step can be run independently on a pre-existing
+# signed zip.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -9,9 +10,6 @@ IFS=$'\n\t'
 SRC_DIR="/srv/src"
 KEYS_DIR="/srv/keys"
 APEX_KEYS_DIR="${KEYS_DIR}/apex"
-OUT_DIR="/srv/out"
-OUT_CERTS_DIR="${OUT_DIR}/certs"
-OUT_APEX_CERTS_DIR="${OUT_CERTS_DIR}/apex"
 SIGNED_TF="/srv/intermediate/signed-target-files.zip"
 APEX_MODULES_LIST="/srv/intermediate/apex-modules.txt"
 HOST_BIN="${SRC_DIR}/out/host/linux-x86/bin"
@@ -33,7 +31,12 @@ APEX_APKS=(
     WifiDialog
 )
 
-echo "==> [60] Signing target files and extracting system.img"
+echo "==> [60] Signing target files"
+
+if [[ "${SKIP_SIGNING:-0}" == "1" ]]; then
+    echo "  -> SKIP_SIGNING=1: skipping."
+    exit 0
+fi
 
 # ─── Locate the unsigned target-files zip ───────────────────────────────────
 shopt -s nullglob
@@ -104,42 +107,5 @@ echo "  -> Signing target files → ${SIGNED_TF} ..."
     -o -d "${KEYS_DIR}" \
     "${FLAGS[@]}" \
     "${TF_ZIP}" "${SIGNED_TF}"
-
-# ─── Extract images ──────────────────────────────────────────────────────────
-# Pipe straight from the signed zip to the output volume so we don't
-# materialise intermediate copies.
-mkdir -p "${OUT_DIR}"
-echo "  -> Extracting IMAGES/system.img → ${OUT_DIR}/system.img ..."
-unzip -p "${SIGNED_TF}" IMAGES/system.img > "${OUT_DIR}/system.img"
-
-# vbmeta.img is produced by sign_target_files_apks: it contains the AVB digest
-# of the signed system partition and is the correct image to flash alongside
-# system.img. Flash it with:
-#   fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img
-# The fastboot flags set the HASHTREE_DISABLED + VERIFICATION_DISABLED bits in
-# the image at flash time, disabling AVB without discarding the correct structure.
-echo "  -> Extracting IMAGES/vbmeta.img → ${OUT_DIR}/vbmeta.img ..."
-unzip -p "${SIGNED_TF}" IMAGES/vbmeta.img > "${OUT_DIR}/vbmeta.img"
-
-# ─── Publish public certs ───────────────────────────────────────────────────
-# Public .x509.pem only — private .pk8 files stay in /srv/keys/ exclusively so
-# the published certs directory is safe to share alongside system.img.
-mkdir -p "${OUT_CERTS_DIR}"
-shopt -s nullglob
-release_certs=("${KEYS_DIR}"/*.x509.pem)
-shopt -u nullglob
-if [[ ${#release_certs[@]} -gt 0 ]]; then
-    echo "  -> Copying release cert public keys to ${OUT_CERTS_DIR}/ ..."
-    cp "${release_certs[@]}" "${OUT_CERTS_DIR}/"
-fi
-
-shopt -s nullglob
-apex_certs=("${APEX_KEYS_DIR}"/*.x509.pem)
-shopt -u nullglob
-if [[ ${#apex_certs[@]} -gt 0 ]]; then
-    mkdir -p "${OUT_APEX_CERTS_DIR}"
-    echo "  -> Copying ${#apex_certs[@]} APEX cert public key(s) to ${OUT_APEX_CERTS_DIR}/ ..."
-    cp "${apex_certs[@]}" "${OUT_APEX_CERTS_DIR}/"
-fi
 
 echo "==> [60] Done."

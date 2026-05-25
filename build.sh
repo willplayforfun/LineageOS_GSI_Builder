@@ -13,28 +13,31 @@ HOST_GID="$(id -g)"
 NPROC="${NPROC:-$(nproc)}"
 SKIP_SYNC="${SKIP_SYNC:-0}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
+SKIP_SIGNING="${SKIP_SIGNING:-0}"
 CLEAN="${CLEAN:-0}"
 VARIANT="${VARIANT:-64VN}"
 
 # ─── CLI flags (override env vars) ───────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --skip-sync)   SKIP_SYNC=1 ;;
-        --skip-build)  SKIP_BUILD=1 ;;
-        --clean)       CLEAN=1 ;;
-        --nproc=*)     NPROC="${1#--nproc=}" ;;
-        --variant=*)   VARIANT="${1#--variant=}" ;;
+        --skip-sync)    SKIP_SYNC=1 ;;
+        --skip-build)   SKIP_BUILD=1 ;;
+        --skip-signing) SKIP_SIGNING=1 ;;
+        --clean)        CLEAN=1 ;;
+        --nproc=*)      NPROC="${1#--nproc=}" ;;
+        --variant=*)    VARIANT="${1#--variant=}" ;;
         *)
             echo "ERROR: Unknown argument: $1" >&2
-            echo "Usage: $0 [--skip-sync] [--skip-build] [--clean] [--nproc=N] [--variant=VARIANT]" >&2
+            echo "Usage: $0 [--skip-sync] [--skip-build] [--skip-signing] [--clean] [--nproc=N] [--variant=VARIANT]" >&2
             echo ""
             echo "Environment variables (can be set in addition to or instead of flags):"
-            echo "  SKIP_SYNC=1    Local-only repo sync (no network; faster iteration after first sync)"
-            echo "  SKIP_BUILD=1   Skip steps 50 (make) and 55 (APEX key discovery); useful when"
-            echo "                 target-files already exist or only out/vbmeta.img is needed"
-            echo "  CLEAN=1        Wipe out/ and intermediate/ before starting"
-            echo "  NPROC=N        Override parallelism (default: all cores)"
-            echo "  VARIANT=64VN   Build variant (default: arm64, vanilla, no su)"
+            echo "  SKIP_SYNC=1     Local-only repo sync (no network; faster iteration after first sync)"
+            echo "  SKIP_BUILD=1    Skip steps 50 (make) and 55 (APEX key discovery)"
+            echo "  SKIP_SIGNING=1  Skip step 60 (sign_target_files_apks); step 62 still extracts"
+            echo "                  images from an existing signed zip in intermediate/"
+            echo "  CLEAN=1         Wipe out/ and intermediate/ before starting"
+            echo "  NPROC=N         Override parallelism (default: all cores)"
+            echo "  VARIANT=64VN    Build variant (default: arm64, vanilla, no su)"
             exit 1
             ;;
     esac
@@ -74,7 +77,7 @@ fi
 
 # ─── Run container ───────────────────────────────────────────────────────────
 echo "==> Starting build container ..."
-echo "    NPROC=${NPROC}  SKIP_SYNC=${SKIP_SYNC}  SKIP_BUILD=${SKIP_BUILD}  VARIANT=${VARIANT}"
+echo "    NPROC=${NPROC}  SKIP_SYNC=${SKIP_SYNC}  SKIP_BUILD=${SKIP_BUILD}  SKIP_SIGNING=${SKIP_SIGNING}  VARIANT=${VARIANT}"
 
 # Use -it when stdin is a terminal, -i only when piped/redirected (e.g. CI).
 docker_flags=(--rm)
@@ -93,5 +96,6 @@ docker run "${docker_flags[@]}" \
     -e "NPROC=${NPROC}" \
     -e "SKIP_SYNC=${SKIP_SYNC}" \
     -e "SKIP_BUILD=${SKIP_BUILD}" \
+    -e "SKIP_SIGNING=${SKIP_SIGNING}" \
     -e "VARIANT=${VARIANT}" \
     "${IMAGE}"
