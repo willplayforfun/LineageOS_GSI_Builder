@@ -17,6 +17,11 @@ APEX_MODULES_LIST="/srv/intermediate/apex-modules.txt"
 
 echo "==> [55] Generating APEX signing keys"
 
+if [[ "${SKIP_BUILD:-0}" == "1" ]]; then
+    echo "  -> SKIP_BUILD=1: skipping."
+    exit 0
+fi
+
 # ─── Locate the unsigned target-files zip from step 50 ───────────────────────
 shopt -s nullglob
 TF_ZIPS=("${SRC_DIR}"/out/target/product/*/obj/PACKAGING/target_files_intermediates/*-target_files-*.zip)

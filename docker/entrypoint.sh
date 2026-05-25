@@ -37,9 +37,11 @@ if [[ ${#scripts[@]} -eq 0 ]]; then
 fi
 
 for script in "${scripts[@]}"; do
+    script_basename="$(basename "${script}")"
+
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  Running: $(basename "${script}")"
+    echo "  Running: ${script_basename}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     bash "${script}"
 done

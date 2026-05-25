@@ -17,6 +17,11 @@ PATCHES_APPLIED_FILE="/srv/intermediate/.patches-applied"
 
 echo "==> [50] Building target-files-package + otatools"
 
+if [[ "${SKIP_BUILD:-0}" == "1" ]]; then
+    echo "  -> SKIP_BUILD=1: skipping."
+    exit 0
+fi
+
 cd "${SRC_DIR}"
 
 # ─── Sanity checks ──────────────────────────────────────────────────────────

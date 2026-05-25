@@ -6,6 +6,7 @@ IFS=$'\n\t'
 
 OUT_DIR="/srv/out"
 IMG="${OUT_DIR}/system.img"
+VBMETA="${OUT_DIR}/vbmeta.img"
 CERTS_DIR="${OUT_DIR}/certs"
 START_FILE="/srv/intermediate/.build-start-time"
 
@@ -39,6 +40,19 @@ if [[ -f "${IMG}" ]]; then
 else
     echo "  Image path : NOT FOUND at ${IMG}"
     echo "               (Expected when running only stage 00 for sync testing.)"
+fi
+
+echo ""
+
+# ─── vbmeta.img ──────────────────────────────────────────────────────────────
+if [[ -f "${VBMETA}" ]]; then
+    VBMETA_SIZE="$(du -sh "${VBMETA}" | cut -f1)"
+    VBMETA_SHA256="$(sha256sum "${VBMETA}" | awk '{print $1}')"
+    echo "  vbmeta path: ${VBMETA}"
+    echo "  vbmeta size: ${VBMETA_SIZE}"
+    echo "  SHA256     : ${VBMETA_SHA256}"
+else
+    echo "  vbmeta.img : not present  (produced by step 65 on a full build)"
 fi
 
 echo ""
