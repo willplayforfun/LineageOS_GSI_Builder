@@ -9,7 +9,7 @@ IFS=$'\n\t'
 SRC_DIR="/srv/src"
 PATCHES_SCRIPT="${SRC_DIR}/lineage_build_unified/apply_patches.sh"
 PATCHES_DIR="${SRC_DIR}/lineage_patches_unified"
-LUNCH_TARGET="lineage_gsi_arm64_bvN_microg-userdebug"
+LUNCH_TARGET="lineage_gsi_arm64_vN_microg-userdebug"
 NPROC="${NPROC:-$(nproc)}"
 # Shared with 00-prep-source.sh: records the lineage_patches_unified HEAD SHA
 # after a successful apply. Both scripts check this to avoid redundant resets.
@@ -94,7 +94,7 @@ if [[ -d out/.module_paths ]]; then
 fi
 
 # ─── Lunch the microG wrapper product ───────────────────────────────────────
-# The wrapper inherits device/lineage/gsi/lineage_gsi_arm64_bvN.mk (provided by
+# The wrapper inherits device/lineage/gsi/lineage_gsi_arm64_vN.mk (provided by
 # AndyCGYan/android_device_lineage_gsi via the unified manifest) and layers
 # vendor/microg/microg.mk on top. See scripts/20-stage-vendor-microg.sh.
 echo "  -> Lunching ${LUNCH_TARGET} ..."

@@ -52,33 +52,33 @@ echo "  -> Generating microg.mk from microg-apks.yaml ..."
 
 # ─── AndroidProducts.mk ──────────────────────────────────────────────────────
 # Discovered by Soong's module finder under any vendor/*. Declaring the
-# wrapper product here is what makes `lunch lineage_gsi_arm64_bvN_microg-userdebug`
+# wrapper product here is what makes `lunch lineage_gsi_arm64_vN_microg-userdebug`
 # resolvable without modifying any repo-managed file. Per AOSP convention this
 # file must only reference $(LOCAL_DIR) (which the build system pre-sets to the
 # containing directory) and must not use conditionals.
 echo "  -> Writing AndroidProducts.mk ..."
 cat > "${VENDOR_DIR}/AndroidProducts.mk" <<'ANDROID_PRODUCTS_MK'
 PRODUCT_MAKEFILES := \
-    $(LOCAL_DIR)/lineage_gsi_arm64_bvN_microg.mk
+    $(LOCAL_DIR)/lineage_gsi_arm64_vN_microg.mk
 
 COMMON_LUNCH_CHOICES := \
-    lineage_gsi_arm64_bvN_microg-userdebug \
-    lineage_gsi_arm64_bvN_microg-user \
-    lineage_gsi_arm64_bvN_microg-eng
+    lineage_gsi_arm64_vN_microg-userdebug \
+    lineage_gsi_arm64_vN_microg-user \
+    lineage_gsi_arm64_vN_microg-eng
 ANDROID_PRODUCTS_MK
 
-# ─── lineage_gsi_arm64_bvN_microg.mk (wrapper product) ───────────────────────
+# ─── lineage_gsi_arm64_vN_microg.mk (wrapper product) ───────────────────────
 # Inherits AndyCGYan's per-variant lineage GSI product makefile and layers
 # vendor/microg/microg.mk on top. The variant suffix is part of the name
-# because the upstream lineage_gsi_arm64_{bvN,bvS,bgN}.mk files are statically
+# because the upstream lineage_gsi_arm64_{vN,bvS,bgN}.mk files are statically
 # variant-specific — to support a different variant later, add a second
 # wrapper inheriting the corresponding base.
-echo "  -> Writing lineage_gsi_arm64_bvN_microg.mk ..."
-cat > "${VENDOR_DIR}/lineage_gsi_arm64_bvN_microg.mk" <<'WRAPPER_MK'
-$(call inherit-product, device/lineage/gsi/lineage_gsi_arm64_bvN.mk)
+echo "  -> Writing lineage_gsi_arm64_vN_microg.mk ..."
+cat > "${VENDOR_DIR}/lineage_gsi_arm64_vN_microg.mk" <<'WRAPPER_MK'
+$(call inherit-product, device/lineage/gsi/lineage_gsi_arm64_vN.mk)
 $(call inherit-product, vendor/microg/microg.mk)
 
-PRODUCT_NAME := lineage_gsi_arm64_bvN_microg
+PRODUCT_NAME := lineage_gsi_arm64_vN_microg
 WRAPPER_MK
 
 # ─── privapp-permissions XML ──────────────────────────────────────────────────
