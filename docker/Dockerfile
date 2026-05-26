@@ -102,7 +102,7 @@ RUN groupadd --gid "${HOST_GID}" builder \
 # Pre-create /srv mount points owned by builder.
 # If Docker auto-creates volume targets they are root-owned; doing it here gives
 # builder ownership before the first mount.
-RUN mkdir -p /srv/src /srv/ccache /srv/keys /srv/intermediate /srv/out \
+RUN mkdir -p /srv/src /srv/ccache /srv/keys /srv/intermediate /srv/out /srv/boot_img \
     && chown -R builder:builder /srv
 
 # Copy pipeline files. Build context must be the repository root:

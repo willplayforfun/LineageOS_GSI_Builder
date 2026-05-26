@@ -7,3 +7,6 @@ Add a section to the README that is a guide for pinning SHAs when patches start 
 
 Add a section to the README describing the 3 layers of authorship and why things are pinned to where they are.
 
+Add a section to the README about pulling the boot partition off the device in order to patch it
+
+Add a flashing guide to the readme

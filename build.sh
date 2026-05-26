@@ -62,7 +62,7 @@ docker build \
 
 # ─── Create host directories if absent ───────────────────────────────────────
 echo "==> Ensuring host directories exist ..."
-for dir in src ccache keys intermediate out; do
+for dir in src ccache keys intermediate out boot_img; do
     mkdir -p "${SCRIPT_DIR}/${dir}"
 done
 
@@ -93,6 +93,7 @@ docker run "${docker_flags[@]}" \
     -v "${SCRIPT_DIR}/keys:/srv/keys" \
     -v "${SCRIPT_DIR}/intermediate:/srv/intermediate" \
     -v "${SCRIPT_DIR}/out:/srv/out" \
+    -v "${SCRIPT_DIR}/boot_img:/srv/boot_img:ro" \
     -e "NPROC=${NPROC}" \
     -e "SKIP_SYNC=${SKIP_SYNC}" \
     -e "SKIP_BUILD=${SKIP_BUILD}" \

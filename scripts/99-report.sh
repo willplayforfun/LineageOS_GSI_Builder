@@ -7,6 +7,7 @@ IFS=$'\n\t'
 OUT_DIR="/srv/out"
 IMG="${OUT_DIR}/system.img"
 VBMETA="${OUT_DIR}/vbmeta.img"
+BOOT_PATCHED="${OUT_DIR}/boot-patched.img"
 CERTS_DIR="${OUT_DIR}/certs"
 START_FILE="/srv/intermediate/.build-start-time"
 
@@ -53,6 +54,21 @@ if [[ -f "${VBMETA}" ]]; then
     echo "  SHA256     : ${VBMETA_SHA256}"
 else
     echo "  vbmeta.img : not present  (produced by step 62 on a full build)"
+fi
+
+echo ""
+
+# ─── Patched boot.img (optional, only if user supplied one) ──────────────────
+if [[ -f "${BOOT_PATCHED}" ]]; then
+    BOOT_SIZE="$(du -sh "${BOOT_PATCHED}" | cut -f1)"
+    BOOT_SHA256="$(sha256sum "${BOOT_PATCHED}" | awk '{print $1}')"
+    echo "  boot path  : ${BOOT_PATCHED}"
+    echo "  boot size  : ${BOOT_SIZE}"
+    echo "  SHA256     : ${BOOT_SHA256}"
+    echo "               (AVB hashtree + verification disabled — flash as boot_a)"
+else
+    echo "  boot-patched.img : not present"
+    echo "                     (drop a stock boot.img into ./boot_img/ to enable step 65)"
 fi
 
 echo ""

@@ -3,6 +3,7 @@ ccache/
 out/
 keys/
 intermediate/
+boot_img/
 *.swp
 *.swo
 .DS_Store

@@ -89,6 +89,60 @@ future OTA packages that will be accepted by existing installations.
 
 ---
 
+## Patching a stock boot.img (devices without a `vbmeta` partition)
+
+Some devices — notably MediaTek-based phones like the Unihertz Jelly Star —
+don't expose a standalone `vbmeta` partition. On those, the dm-verity root
+hash for `system` is chain-loaded from the **boot** image's AVB footer.
+Flashing a GSI without also disabling verity there gets you stuck at
+"Can't load Android system. Your data may be corrupt." in recovery.
+
+If you drop a stock `boot.img` for your device into `./boot_img/boot.img`,
+the pipeline runs an extra step (`65-patch-boot.sh`) that:
+
+1. Copies the file (the input is never modified).
+2. Locates the AVB footer (last 64 bytes, `AVBf` magic) and the vbmeta
+   header it points to.
+3. Sets `HASHTREE_DISABLED` and `VERIFICATION_DISABLED` in the vbmeta
+   flags field — the same bits `fastboot --disable-verity
+   --disable-verification flash` sets at flash time.
+4. Writes the result to `out/boot-patched.img`.
+
+Flash it alongside your `system.img`:
+
+```bash
+fastboot flash boot_a out/boot-patched.img
+fastboot flash system_a out/system.img
+fastboot -w
+fastboot reboot
+```
+
+The patched image's signature no longer verifies — that's expected. On an
+unlocked bootloader (which you already need for any of this) the signature
+mismatch is downgraded to a warning, and the kernel still honors the
+disabled-flag bits.
+
+### Getting a stock boot.img
+
+Two routes:
+
+- **Dump from the device** (most reliable): boot a custom recovery
+  (TWRP/OrangeFox) via `fastboot boot twrp.img`, then
+  `dd if=/dev/block/by-name/boot_a of=/sdcard/boot.img bs=4M` and
+  `adb pull /sdcard/boot.img`.
+- **Extract from OEM firmware**: download the stock firmware package
+  from your manufacturer. For Unihertz/MTK devices this is an SP Flash
+  Tool package — `boot.img` is a top-level file inside.
+
+If the resulting file is not where verity lives on your device, step 65
+will error with a hint. Inspect with `avbtool info_image --image boot.img`
+to see whether there's an AVB footer at all.
+
+The `./boot_img/` directory is gitignored — OEM firmware should never be
+committed.
+
+---
+
 ## Customisation
 
 ### Changing microG / FLOSS app versions
@@ -139,6 +193,8 @@ VARIANT=64VS ./build.sh   # arm64, vanilla, with su (superuser)
 | `50-build.sh` | Apply `lineage_patches_unified` patches, `lunch` the microG wrapper product, then `make target-files-package otatools` |
 | `55-generate-apex-keys.sh` | Discover APEX modules in the unsigned target files and mint 4096-bit APEX keys on demand |
 | `60-sign.sh` | Sign target files (incl. discovered APEXes) and extract `system.img` |
+| `62-extract-images.sh` | Extract `system.img` and `vbmeta.img` from the signed target-files zip and publish certs |
+| `65-patch-boot.sh` | (Optional) Patch a stock boot.img dropped into `./boot_img/` to disable AVB verity, for devices without a `vbmeta` partition |
 | `99-report.sh` | Print build summary |
 
 > **Current status**: All scripts above are implemented. The pipeline has not
