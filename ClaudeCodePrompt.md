@@ -57,4 +57,11 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 - Where you make a non-obvious decision (e.g. "we use `LOCAL_CERTIFICATE := platform` for GmsCore because..."), leave a short comment explaining why.
 - Don't introduce dependencies the prompt doesn't already require. No Python, no Node, no Ansible — Bash and standard Unix tools only.
 
+### Comment style
+
+- **Scope: describe what's in front of you, not what surrounds it.** Comments and error messages should describe the current script's behaviour or the broken pre-condition — not which step number is responsible, not what a downstream step will do with the output, not why a prior approach was abandoned.
+- **Stop at the rule, not the mechanism.** State the consequence or invariant ("always expands correctly regardless of IFS"). Only go deeper if the mechanism itself is what's surprising (e.g. a tool that always exits 1 even on success, a bash function masquerading as a binary).
+- **Keep comments that prevent "fixing" correct-but-odd code; cut comments that annotate obvious code.** If a reader would misread the code as broken and try to change it, the comment earns its place. If the comment just restates what the code already says or adds "nice to know" context, cut it.
+- **Procedures belong in the README.** Inline comments are not the place for flash instructions, fallback recipes, or step-by-step escape hatches. A brief description of *what* something does is fine; a tutorial on *how to use it* is not.
+
 Begin by reading the prompt fully, then sketching the directory structure and dependencies between scripts before writing any file. When you've created everything, run the verification checklist and report the results.
