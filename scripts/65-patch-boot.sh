@@ -148,15 +148,24 @@ cp "${VENDOR_BOOT_IN}" "${VENDOR_WORK_DIR}/vendor_boot.img"
 echo "  -> magiskboot unpack ..."
 ( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" unpack vendor_boot.img )
 
-if [[ ! -f "${VENDOR_WORK_DIR}/ramdisk.cpio" ]]; then
+# vendor_boot v3 produces ramdisk.cpio; v4 produces ramdisk.cpio.{index}.
+# Collect all candidates and patch each one.
+mapfile -t VENDOR_RAMDISKS < <(
+    find "${VENDOR_WORK_DIR}" -maxdepth 1 -name 'ramdisk.cpio*' | sort
+)
+
+if [[ ${#VENDOR_RAMDISKS[@]} -eq 0 ]]; then
     echo "ERROR: magiskboot did not produce a ramdisk.cpio from vendor_boot.img." >&2
     echo "       The image may use an unusual layout." >&2
     exit 1
 fi
 
-echo ""
-echo "  -> magiskboot cpio ramdisk.cpio patch ..."
-( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" cpio ramdisk.cpio "patch" )
+for ramdisk in "${VENDOR_RAMDISKS[@]}"; do
+    name="$(basename "${ramdisk}")"
+    echo ""
+    echo "  -> magiskboot cpio ${name} patch ..."
+    ( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" cpio "${name}" "patch" )
+done
 
 echo ""
 echo "  -> magiskboot repack vendor_boot.img ..."
