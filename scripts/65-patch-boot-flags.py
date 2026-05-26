@@ -52,7 +52,7 @@ VBMETA_MAGIC      = b"AVB0"
 VBMETA_FLAGS_OFF  = 0x78        # u32 BE, offset within vbmeta header
 
 
-def patch(path: str) -> int:
+def patch(path):
     with open(path, "r+b") as f:
         f.seek(0, 2)
         size = f.tell()
@@ -116,7 +116,7 @@ def patch(path: str) -> int:
         return 0
 
 
-def main(argv: list[str]) -> int:
+def main(argv):
     if len(argv) != 2:
         sys.stderr.write(f"Usage: {argv[0]} <boot.img>\n")
         return 64  # EX_USAGE
