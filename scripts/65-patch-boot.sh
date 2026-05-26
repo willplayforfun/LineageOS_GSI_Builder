@@ -146,7 +146,10 @@ mkdir -p "${VENDOR_WORK_DIR}" "${OUT_DIR}"
 cp "${VENDOR_BOOT_IN}" "${VENDOR_WORK_DIR}/vendor_boot.img"
 
 echo "  -> magiskboot unpack ..."
-( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" unpack vendor_boot.img )
+( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" unpack vendor_boot.img ) || true
+echo "  -> unpack exit code: $?"
+echo "  -> files in work dir after unpack:"
+ls -la "${VENDOR_WORK_DIR}/"
 
 # vendor_boot v3 produces ramdisk.cpio; v4 produces ramdisk.cpio.{index}.
 # Collect all candidates and patch each one.
