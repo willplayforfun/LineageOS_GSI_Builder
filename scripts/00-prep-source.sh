@@ -121,6 +121,15 @@ fi
 # Doesn't yet apply pins (zz-commit-pins.xml not generated) or pull
 # treble-specific projects (upstream-treble.xml not installed) — both happen
 # in the second sync below.
+#
+# Remove any stale zz-commit-pins.xml left by a previous run before syncing.
+# If the pins have changed (e.g. switching from -light to -td), the old file
+# overrides andycgyan-unified.xml's branch declaration (zz-* sorts last) and
+# keeps lineage_build_unified on the obsolete SHA — causing the git show below
+# to fail because the new SHA isn't in the old clone. Deleting it here is safe:
+# the file is always regenerated from pins.yaml between the two syncs.
+rm -f "${MANIFESTS_DST}/zz-commit-pins.xml"
+
 if [[ "${SKIP_SYNC}" == "1" ]]; then
     echo "  -> SKIP_SYNC=1: first sync is local-only (working-tree reset, no fetch)."
 else
