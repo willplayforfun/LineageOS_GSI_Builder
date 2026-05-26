@@ -146,15 +146,12 @@ mkdir -p "${VENDOR_WORK_DIR}" "${OUT_DIR}"
 cp "${VENDOR_BOOT_IN}" "${VENDOR_WORK_DIR}/vendor_boot.img"
 
 echo "  -> magiskboot unpack ..."
-( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" unpack vendor_boot.img ) || true
-echo "  -> unpack exit code: $?"
-echo "  -> files in work dir after unpack:"
-ls -la "${VENDOR_WORK_DIR}/"
+( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" unpack vendor_boot.img )
 
-# vendor_boot v3 produces ramdisk.cpio; v4 produces ramdisk.cpio.{index}.
-# Collect all candidates and patch each one.
+# v3 extracts ramdisk.cpio at the top level; v4 extracts into vendor_ramdisk/
+# (possibly with multiple cpio files inside). Search the whole work tree.
 mapfile -t VENDOR_RAMDISKS < <(
-    find "${VENDOR_WORK_DIR}" -maxdepth 1 -name 'ramdisk.cpio*' | sort
+    find "${VENDOR_WORK_DIR}" -name 'ramdisk.cpio*' | sort
 )
 
 if [[ ${#VENDOR_RAMDISKS[@]} -eq 0 ]]; then
@@ -164,10 +161,10 @@ if [[ ${#VENDOR_RAMDISKS[@]} -eq 0 ]]; then
 fi
 
 for ramdisk in "${VENDOR_RAMDISKS[@]}"; do
-    name="$(basename "${ramdisk}")"
+    relpath="${ramdisk#${VENDOR_WORK_DIR}/}"
     echo ""
-    echo "  -> magiskboot cpio ${name} patch ..."
-    ( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" cpio "${name}" "patch" )
+    echo "  -> magiskboot cpio ${relpath} patch ..."
+    ( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" cpio "${relpath}" "patch" )
 done
 
 echo ""
