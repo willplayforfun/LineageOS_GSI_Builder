@@ -60,7 +60,7 @@ apks:
 
   - module: AuroraStore
     filename: AuroraStore.apk
-    url: https://auroraoss.com/downloads/AuroraStore/Stable/AuroraStore-4.7.1.apk
+    url: https://f-droid.org/repo/com.aurora.store_75.apk       
     sha256: SKIP
     certificate: PRESIGNED
     privileged: true
