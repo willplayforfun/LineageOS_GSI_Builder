@@ -9,7 +9,7 @@ The output is a `system.img` file suitable for flashing to the
 unlocked bootloader, along with a `vbmeta.img` and/or optional patched `boot.img`
 that disables verity checks that would prevent the modified system image from loading. 
 
-This is roughly equivalent to AndyCGYan's `lineage_gsi_arm64_vN` target on the
+This is roughly equivalent to AndyCGYan's `lineage_gsi_arm64_bvN` target on the
 `lineage-20-td` branch, signed with self-generated release keys.
 
 ---

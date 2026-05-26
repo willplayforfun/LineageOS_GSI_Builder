@@ -187,7 +187,7 @@ echo "  -> Generating zz-commit-pins.xml from config/pins.yaml ..."
 # ─── Second repo sync ────────────────────────────────────────────────────────
 # Now that both upstream-treble.xml and zz-commit-pins.xml are in place, this
 # sync resets the pinned projects to their pinned SHAs and pulls the
-# treble-specific projects declared by the upstream manifest (device/lineage/gsi,
+# treble-specific projects declared by the upstream manifest (device/phh/treble,
 # vendor/hardware_overlay, packages/apps/QcRilAm, vendor/gapps). Incremental
 # for projects already cloned by the first sync — fast.
 if [[ "${SKIP_SYNC}" == "1" ]]; then

@@ -96,7 +96,7 @@ echo "  -> APEX-APK flags built for ${#APEX_APKS[@]} APK(s)."
 mkdir -p "$(dirname "${SIGNED_TF}")"
 echo "  -> Signing target files → ${SIGNED_TF} ..."
 # --allow_gsi_debug_sepolicy: the upstream GSI product makefile
-# (device/lineage/gsi/lineage_gsi_arm64_vN.mk) sets SELINUX_IGNORE_NEVERALLOWS
+# (device/phh/treble/lineage_arm64_bvN.mk) sets SELINUX_IGNORE_NEVERALLOWS
 # and PRODUCT_INSTALL_DEBUG_POLICY_TO_SYSTEM_EXT unconditionally — both are
 # required for a GSI that must run on arbitrary vendor implementations and are
 # incompatible with the -user build variant. The GSI is therefore built as

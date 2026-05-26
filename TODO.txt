@@ -9,3 +9,4 @@ Add a section to the README describing the 3 layers of authorship and why things
 
 Add a flashing guide to the readme
 
+TrebleApp build — TrebleApp is a small app that ships inside GSIs to handle Treble-specific compatibility shims. The buildbot builds it from source on every run and slots it in before the main build. We're using whatever pre-built APK was committed at our vendor/hardware_overlay pin point — which is frozen at 2023. This is likely fine for now but worth noting as a known deviation.

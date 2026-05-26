@@ -11,7 +11,7 @@ A single `system.img` file (sparse Android image) suitable for flashing to the `
 - **Partition scheme**: AB / system-as-root (the `b` in the variant name)
 - **GAPPS**: none (`v` = vanilla)
 - **Superuser**: none (`N`)
-- **Equivalent to**: AndyCGYan's `lineage_gsi_arm64_vN` target on the `lineage-20-td` branch, plus microG GmsCore, microG Companion (FakeStore), F-Droid, and Aurora Store as pre-installed privileged apps
+- **Equivalent to**: AndyCGYan's `lineage_gsi_arm64_bvN` target on the `lineage-20-td` branch, plus microG GmsCore, microG Companion (FakeStore), F-Droid, and Aurora Store as pre-installed privileged apps
 - **Signed**: with self-generated release keys (or reused keys from a prior run)
 
 ## Inputs and outputs the pipeline must handle
@@ -49,7 +49,7 @@ from the repository root. The script must:
 ├── scripts/
 │   ├── 00-prep-source.sh              # repo init + sync + local manifest setup
 │   ├── 10-fetch-microg.sh             # Download microG / FLOSS APKs
-│   ├── 20-stage-vendor-microg.sh      # Write vendor/microg/{Android.mk,microg.mk,AndroidProducts.mk,lineage_gsi_arm64_vN_microg.mk}
+│   ├── 20-stage-vendor-microg.sh      # Write vendor/microg/{Android.mk,microg.mk,AndroidProducts.mk,lineage_gsi_arm64_bvN_microg.mk}
 │   ├── 40-generate-keys.sh            # AOSP key generation into /srv/keys (idempotent)
 │   ├── 45-stage-vendor-keys.sh        # Build intermediate/lineage-priv, symlink into src
 │   ├── 50-build.sh                    # Apply patches, lunch the microG wrapper, make target-files-package + otatools
@@ -111,7 +111,7 @@ Each script must be **idempotent** and **resumable**: if its output already exis
 - Create `/srv/src/.repo/local_manifests/` if absent.
 - Copy every `*.xml` from `/opt/pipeline/config/local_manifests/` into `/srv/src/.repo/local_manifests/`. This includes the pre-committed `andycgyan-unified.xml` (see below), so `repo sync` handles `lineage_build_unified` and `lineage_patches_unified` as proper repo projects rather than ad-hoc git clones.
 - `repo sync` (full fetch + checkout by default; `repo sync -l --force-sync` when `SKIP_SYNC=1` — local-only working-tree checkout, no network).
-- **Two-sync flow** to avoid an external HTTPS fetch for the upstream treble manifest. **First sync** pulls the default LineageOS tree plus the two projects declared by `andycgyan-unified.xml` (`lineage_build_unified`, `lineage_patches_unified`) — without pins applied and without treble-specific projects. After that, the script extracts `upstream-treble.xml` from the synced `lineage_build_unified` repo via `git show ${PIN_LBU}:local_manifests_treble/manifest.xml` (content-addressed by the pinned SHA, not the working-tree HEAD, so it stays deterministic if the pin and the branch tip ever diverge), generates `commit-pins.xml` from `pins.yaml`, and runs a **second `repo sync`** which applies the pins and pulls the treble-specific projects (`device/lineage/gsi`, `vendor/hardware_overlay`, `packages/apps/QcRilAm`, `vendor/gapps`). The second sync is incremental and fast on every run after the first.
+- **Two-sync flow** to avoid an external HTTPS fetch for the upstream treble manifest. **First sync** pulls the default LineageOS tree plus the two projects declared by `andycgyan-unified.xml` (`lineage_build_unified`, `lineage_patches_unified`) — without pins applied and without treble-specific projects. After that, the script extracts `upstream-treble.xml` from the synced `lineage_build_unified` repo via `git show ${PIN_LBU}:local_manifests_treble/manifest.xml` (content-addressed by the pinned SHA, not the working-tree HEAD, so it stays deterministic if the pin and the branch tip ever diverge), generates `commit-pins.xml` from `pins.yaml`, and runs a **second `repo sync`** which applies the pins and pulls the treble-specific projects (`device/phh/treble`, `vendor/hardware_overlay`, `packages/apps/QcRilAm`, `vendor/gapps`). The second sync is incremental and fast on every run after the first.
 
 `config/local_manifests/andycgyan-unified.xml` must be committed to the pipeline repo with the following contents (or equivalent):
 
@@ -165,8 +165,8 @@ Specifically, the script generates these files under `/srv/intermediate/vendor-m
 
 - `Android.mk` — **generated** by `apks-tool.py generate-android-mk` from `config/microg-apks.yaml`. Each YAML entry becomes one `BUILD_PREBUILT` module with `LOCAL_MODULE`, `LOCAL_SRC_FILES`, and `LOCAL_CERTIFICATE` (per-entry: `platform` for GmsCore/Companion so the framework grants `FAKE_PACKAGE_SIGNATURE` to platform-signed apps; `PRESIGNED` for F-Droid/Aurora Store so their upstream developer signatures stay intact). `LOCAL_PRIVILEGED_MODULE := true` and `LOCAL_PRODUCT_MODULE := true` apply to all current entries.
 - `microg.mk` — **generated** by `apks-tool.py generate-microg-mk` from the same YAML. Dynamic `PRODUCT_PACKAGES` (module names from YAML) followed by a static `PRODUCT_COPY_FILES` block for the GmsCore privapp-permissions XML. The `PRODUCT_COPY_FILES` block intentionally lives in the tool (not as a per-APK YAML field) because it's GmsCore-specific and not actually per-APK metadata; if another APK ever needs its own static extras, add a second static block in the tool.
-- `AndroidProducts.mk` — auto-discovered by `build/envsetup.sh` under `vendor/*`, this registers the wrapper product (`lineage_gsi_arm64_vN_microg`) and its lunch combos. Per AOSP convention it may only reference `$(LOCAL_DIR)` and must not use conditionals.
-- `lineage_gsi_arm64_vN_microg.mk` — the wrapper product itself. `inherit-product`s `device/lineage/gsi/lineage_gsi_arm64_vN.mk` (AndyCGYan's per-variant lineage GSI base product, brought in by the unified manifest), then `inherit-product`s `vendor/microg/microg.mk`, then sets `PRODUCT_NAME := lineage_gsi_arm64_vN_microg`. This is the linchpin that lets us combine the upstream lineage GSI product with our microG package set without touching any repo-managed file. The variant suffix is part of the name because the upstream `lineage_gsi_arm64_{vN,vS,gN}.mk` files are statically variant-specific — to support a different variant later, add a second wrapper inheriting the corresponding base. See section 30 below for the design rationale.
+- `AndroidProducts.mk` — auto-discovered by `build/envsetup.sh` under `vendor/*`, this registers the wrapper product (`lineage_gsi_arm64_bvN_microg`) and its lunch combos. Per AOSP convention it may only reference `$(LOCAL_DIR)` and must not use conditionals.
+- `lineage_gsi_arm64_bvN_microg.mk` — the wrapper product itself. `inherit-product`s `device/phh/treble/lineage_arm64_bvN.mk` (AndyCGYan's per-variant lineage GSI base product, brought in by the unified manifest), then `inherit-product`s `vendor/microg/microg.mk`, then sets `PRODUCT_NAME := lineage_gsi_arm64_bvN_microg`. This is the linchpin that lets us combine the upstream lineage GSI product with our microG package set without touching any repo-managed file. The variant suffix is part of the name because the upstream `lineage_gsi_arm64_{vN,vS,gN}.mk` files are statically variant-specific — to support a different variant later, add a second wrapper inheriting the corresponding base. See section 30 below for the design rationale.
 - `permissions/privapp-permissions-com.google.android.gms.xml` — created inline in the script.
 - `prebuilts/` — this subdirectory is already populated by step 10; the script must not clobber it, only ensure it exists.
 
@@ -186,15 +186,15 @@ Because every file written here is small and produced via clobbering `cat > …`
 >
 > **Why not the alternatives:**
 >
-> - **Naïve `sed` patch into a repo-managed product makefile** (e.g. `device/lineage/gsi/lineage_gsi_arm64_vN.mk`) — works on first run but re-applying after every `repo sync` / patch refresh is fragile, and any conflict with upstream changes silently breaks the microG injection.
+> - **Naïve `sed` patch into a repo-managed product makefile** (e.g. `device/phh/treble/lineage_arm64_bvN.mk`) — works on first run but re-applying after every `repo sync` / patch refresh is fragile, and any conflict with upstream changes silently breaks the microG injection.
 > - **Option B (`PRODUCT_PACKAGES+=` on the make command line)** — Kati's handling of command-line product-config variables is less reliable than makefile inheritance, and `microg.mk` does more than just `PRODUCT_PACKAGES` (it also has `PRODUCT_COPY_FILES` for the privapp-permissions XML), so the override would have to be repeated for each variable.
 > - **Option C (patch a repo-managed file via `lineage_patches_unified`)** — still modifies a repo-managed file (one level removed), and adds yet another patch to the `lineage_patches_unified` pile that step 50 already calls out as a known source of intermittent failures.
 >
 > **How Option A works in practice:**
 >
 > 1. Step 20 writes `vendor/microg/AndroidProducts.mk`, which is auto-discovered by `source build/envsetup.sh` under any `vendor/*`. It declares the wrapper lunch combos.
-> 2. Step 20 also writes `vendor/microg/lineage_gsi_arm64_vN_microg.mk`, which `inherit-product`s `device/lineage/gsi/lineage_gsi_arm64_vN.mk` (AndyCGYan's lineage GSI vanilla/no-su variant, pulled in by the unified manifest) and `vendor/microg/microg.mk`, then sets `PRODUCT_NAME := lineage_gsi_arm64_vN_microg`.
-> 3. Step 50 applies the `lineage_patches_unified` patches, then `lunch lineage_gsi_arm64_vN_microg-userdebug`, then `make target-files-package otatools`. The wrapper resolves cleanly because the upstream lineage GSI product makefile is on disk by then.
+> 2. Step 20 also writes `vendor/microg/lineage_gsi_arm64_bvN_microg.mk`, which `inherit-product`s `device/phh/treble/lineage_arm64_bvN.mk` (AndyCGYan's lineage GSI vanilla/no-su variant, pulled in by the unified manifest) and `vendor/microg/microg.mk`, then sets `PRODUCT_NAME := lineage_gsi_arm64_bvN_microg`.
+> 3. Step 50 applies the `lineage_patches_unified` patches, then `lunch lineage_gsi_arm64_bvN_microg-userdebug`, then `make target-files-package otatools`. The wrapper resolves cleanly because the upstream lineage GSI product makefile is on disk by then.
 >
 > No repo-managed file is ever modified. The variant suffix is in the wrapper name because the upstream lineage GSI product files are statically per-variant — supporting `vS` or `gN` is a matter of writing a second wrapper that inherits the corresponding base; `gN` (GAPPS) is intentionally excluded because GAPPS conflicts with microG.
 
@@ -233,12 +233,13 @@ The result: `/srv/src/vendor/lineage-priv/keys/` resolves to `/srv/intermediate/
 
 Because the integration uses an `AndroidProducts.mk` wrapper (see step 30 above), this script owns the `apply-patches → lunch → make` sequence explicitly rather than delegating wholesale to `buildbot_unified.sh`. The flow is:
 
-1. Apply the `lineage_patches_unified` patches by calling `lineage_build_unified/apply_patches.sh` with the `patches_platform` and `patches_treble` groups. That `apply_patches.sh` runs `git clean -fdx && git reset --hard` on each project before re-applying, so it's safe to invoke on every run — no sentinel needed. This is the same flow `buildbot_unified.sh` uses; we deliberately skip its `repo sync` block (step 00 owns sync) and its `repopick` block (those cherry-picks are not currently required for this build). If patches fail to apply (a known intermittent issue documented on XDA), `apply_patches.sh` exits non-zero and `set -e` propagates the failure — surface it to the user with the path to the failing patch.
-2. `cd /srv/src && source build/envsetup.sh`. Sourced after patches in case any patch touches envsetup itself.
-3. `lunch lineage_gsi_arm64_vN_microg-userdebug` (the wrapper combo declared by `vendor/microg/AndroidProducts.mk`). The wrapper inherits `device/lineage/gsi/lineage_gsi_arm64_vN.mk` (provided by `AndyCGYan/android_device_lineage_gsi` via the unified manifest) and layers `vendor/microg/microg.mk` on top.
+1. Apply the `lineage_patches_unified` patches by calling `lineage_build_unified/apply_patches.sh` with the four groups in order: `patches_treble_prerequisite`, `patches_treble_td`, `patches_platform`, `patches_treble`. The `patches_treble` group includes `0001-treble-Lineage-ify.patch` which patches `device/phh/treble/generate.sh` to emit `lineage_*` product names instead of `treble_*`. That `apply_patches.sh` runs `git clean -fdx && git reset --hard` on each project before re-applying, so it's safe to invoke on every run — no sentinel needed. If patches fail to apply, `apply_patches.sh` exits non-zero and `set -e` propagates the failure.
+2. Run `bash device/phh/treble/generate.sh lineage` to generate `lineage_arm64_bvN.mk` (and other variant makefiles) in `device/phh/treble/`. These are untracked files not shipped in the repo; they must be regenerated every run after patches.
+3. `cd /srv/src && source build/envsetup.sh`. Sourced after patches in case any patch touches envsetup itself.
+4. `lunch lineage_gsi_arm64_bvN_microg-userdebug` (the wrapper combo declared by `vendor/microg/AndroidProducts.mk`). The wrapper inherits `device/phh/treble/lineage_arm64_bvN.mk` (generated in the previous step) and layers `vendor/microg/microg.mk` on top.
 4. `make -j${NPROC} target-files-package otatools`. This produces both the **unsigned** target-files zip under `out/target/product/*/obj/PACKAGING/target_files_intermediates/` (with the `META/apexkeys.txt` manifest step 55 reads) and the `otatools` package containing `sign_target_files_apks` that step 60 calls. Do **not** use `make systemimage` here — we want the target-files form so signing can happen as a separate stage.
 
-Output of the build will be under `/srv/src/out/target/product/lineage_gsi_arm64_vN_microg/` (the wrapper's `PRODUCT_NAME` becomes the output directory). The unsigned `system.img` is also present here, but step 60 produces the signed image we actually ship.
+Output of the build will be under `/srv/src/out/target/product/lineage_gsi_arm64_bvN_microg/` (the wrapper's `PRODUCT_NAME` becomes the output directory). The unsigned `system.img` is also present here, but step 60 produces the signed image we actually ship.
 
 ### `55-generate-apex-keys.sh`
 

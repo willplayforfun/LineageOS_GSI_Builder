@@ -9,7 +9,7 @@ IFS=$'\n\t'
 SRC_DIR="/srv/src"
 PATCHES_SCRIPT="${SRC_DIR}/lineage_build_unified/apply_patches.sh"
 PATCHES_DIR="${SRC_DIR}/lineage_patches_unified"
-LUNCH_TARGET="lineage_gsi_arm64_vN_microg-userdebug"
+LUNCH_TARGET="lineage_gsi_arm64_bvN_microg-userdebug"
 NPROC="${NPROC:-$(nproc)}"
 # Shared with 00-prep-source.sh: records the lineage_patches_unified HEAD SHA
 # after a successful apply. Both scripts check this to avoid redundant resets.
@@ -28,6 +28,8 @@ cd "${SRC_DIR}"
 for path in \
     "${SRC_DIR}/build/envsetup.sh" \
     "${PATCHES_SCRIPT}" \
+    "${PATCHES_DIR}/patches_treble_prerequisite" \
+    "${PATCHES_DIR}/patches_treble_td" \
     "${PATCHES_DIR}/patches_platform" \
     "${PATCHES_DIR}/patches_treble"
 do
@@ -55,6 +57,20 @@ _applied_hash=$(cat "${PATCHES_APPLIED_FILE}" 2>/dev/null || echo "")
 if [[ -n "${_current_patches_head}" && "${_current_patches_head}" == "${_applied_hash}" ]]; then
     echo "  -> Patch set unchanged (${_current_patches_head:0:12}…) — skipping reset and re-apply."
 else
+    # Apply in the same order as buildbot_unified.sh on the -td branch:
+    #   1. patches_treble_prerequisite — framework prereqs (frameworks/base, etc.)
+    #   2. patches_treble_td          — TrebleDroid-specific patches
+    #   3. patches_platform           — LineageOS platform patches
+    #   4. patches_treble             — treble integration patches, including
+    #                                   0001-treble-Lineage-ify which patches
+    #                                   device/phh/treble/generate.sh to emit
+    #                                   lineage_* product names instead of treble_*
+    echo "  -> Applying patches_treble_prerequisite ..."
+    bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_treble_prerequisite"
+
+    echo "  -> Applying patches_treble_td ..."
+    bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_treble_td"
+
     echo "  -> Applying patches_platform ..."
     bash "${PATCHES_SCRIPT}" "${PATCHES_DIR}/patches_platform"
 
@@ -64,6 +80,15 @@ else
     # Record the applied SHA so the next run can detect an unchanged patch set.
     echo "${_current_patches_head}" > "${PATCHES_APPLIED_FILE}"
 fi
+
+# ─── Generate device/phh/treble product makefiles ───────────────────────────
+# On the -td branch, device/phh/treble does not ship pre-generated product
+# makefiles. generate.sh (patched by 0001-treble-Lineage-ify to emit lineage_*
+# product names) must be run after patches to create lineage_arm64_bvN.mk etc.
+# These files are untracked, so they survive incremental builds but are wiped
+# by repo sync resets — always regenerate here so lunch can find the product.
+echo "  -> Generating device/phh/treble product makefiles ..."
+bash "${SRC_DIR}/device/phh/treble/generate.sh" lineage
 
 # ─── Source envsetup ────────────────────────────────────────────────────────
 # Sourced after patches in case any patch modifies envsetup itself.
@@ -94,9 +119,9 @@ if [[ -d out/.module_paths ]]; then
 fi
 
 # ─── Lunch the microG wrapper product ───────────────────────────────────────
-# The wrapper inherits device/lineage/gsi/lineage_gsi_arm64_vN.mk (provided by
-# AndyCGYan/android_device_lineage_gsi via the unified manifest) and layers
-# vendor/microg/microg.mk on top. See scripts/20-stage-vendor-microg.sh.
+# The wrapper (written by step 20) inherits device/phh/treble/lineage_arm64_bvN.mk
+# (generated above by generate.sh lineage) and layers vendor/microg/microg.mk
+# on top. See scripts/20-stage-vendor-microg.sh.
 echo "  -> Lunching ${LUNCH_TARGET} ..."
 lunch "${LUNCH_TARGET}"
 
@@ -115,8 +140,14 @@ lunch "${LUNCH_TARGET}"
 # Calling -M on every run is safe — it is a fast metadata write and idempotent.
 "${CCACHE_EXEC}" -M 50G
 
+# installclean removes previously-installed files from $OUT before rebuilding,
+# preventing stale artifacts from prior builds sneaking into the new image.
+# Matches what buildbot_unified.sh does before every treble build.
+echo "  -> make installclean ..."
+make installclean
+
 echo "  -> make -j${NPROC} target-files-package otatools ..."
-make -j"${NPROC}" target-files-package otatools
+WITH_ADB_INSECURE=true make -j"${NPROC}" target-files-package otatools
 
 IFS="$_saved_ifs"
 set -u  # restore nounset + IFS now that envsetup + lunch + make are done
