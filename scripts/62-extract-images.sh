@@ -7,12 +7,14 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SRC_DIR="/srv/src"
 KEYS_DIR="/srv/keys"
 APEX_KEYS_DIR="${KEYS_DIR}/apex"
 SIGNED_TF="/srv/intermediate/signed-target-files.zip"
 OUT_DIR="/srv/out"
 OUT_CERTS_DIR="${OUT_DIR}/certs"
 OUT_APEX_CERTS_DIR="${OUT_CERTS_DIR}/apex"
+HOST_BIN="${SRC_DIR}/out/host/linux-x86/bin"
 
 echo "==> [62] Extracting images and publishing certs"
 
@@ -26,8 +28,19 @@ fi
 # Pipe straight from the signed zip to the output volume so we don't
 # materialise intermediate copies.
 mkdir -p "${OUT_DIR}"
-echo "  -> Extracting IMAGES/system.img → ${OUT_DIR}/system.img ..."
-unzip -p "${SIGNED_TF}" IMAGES/system.img > "${OUT_DIR}/system.img"
+echo "  -> Extracting IMAGES/system.img → ${OUT_DIR}/system.img (sparse) ..."
+IMG2SIMG="${HOST_BIN}/img2simg"
+if [[ ! -x "${IMG2SIMG}" ]]; then
+    echo "ERROR: ${IMG2SIMG} not found." >&2
+    echo "       Step 50 must include 'otatools' in its make target." >&2
+    exit 1
+fi
+TMPIMG=$(mktemp)
+trap 'rm -f "${TMPIMG}"' EXIT
+unzip -p "${SIGNED_TF}" IMAGES/system.img > "${TMPIMG}"
+"${IMG2SIMG}" "${TMPIMG}" "${OUT_DIR}/system.img"
+trap - EXIT
+rm -f "${TMPIMG}"
 
 # vbmeta.img is produced by sign_target_files_apks: it contains the AVB digest
 # of the signed system partition and is the correct image to flash alongside
