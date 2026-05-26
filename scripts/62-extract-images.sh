@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Purpose: Extract system.img and vbmeta.img from the signed target-files zip
-# produced by step 60, and publish public certs into /srv/out. Runs regardless
-# of --skip-signing so images are always re-extracted from whatever signed zip
-# is present.
+# and publish public certs into /srv/out.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -25,14 +23,13 @@ if [[ ! -f "${SIGNED_TF}" ]]; then
 fi
 
 # ─── Extract images ──────────────────────────────────────────────────────────
-# Pipe straight from the signed zip to the output volume so we don't
-# materialise intermediate copies.
+# img2simg takes a file path and seeks within it; unzip -p can't feed it
+# directly, so we unzip system.img to a temp file, convert, then delete it.
 mkdir -p "${OUT_DIR}"
 echo "  -> Extracting IMAGES/system.img → ${OUT_DIR}/system.img (sparse) ..."
 IMG2SIMG="${HOST_BIN}/img2simg"
 if [[ ! -x "${IMG2SIMG}" ]]; then
     echo "ERROR: ${IMG2SIMG} not found." >&2
-    echo "       Step 50 must include 'otatools' in its make target." >&2
     exit 1
 fi
 TMPIMG=$(mktemp)
@@ -43,11 +40,9 @@ trap - EXIT
 rm -f "${TMPIMG}"
 
 # vbmeta.img is produced by sign_target_files_apks: it contains the AVB digest
-# of the signed system partition and is the correct image to flash alongside
-# system.img. Flash it with:
-#   fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img
-# The fastboot flags set the HASHTREE_DISABLED + VERIFICATION_DISABLED bits in
-# the image at flash time, disabling AVB without discarding the correct structure.
+# of the signed system partition. It is flashed with `--disable-verity --disable-verification`,
+# which set the HASHTREE_DISABLED + VERIFICATION_DISABLED bits to disable AVB 
+# without discarding the correct structure.
 echo "  -> Extracting IMAGES/vbmeta.img → ${OUT_DIR}/vbmeta.img ..."
 unzip -p "${SIGNED_TF}" IMAGES/vbmeta.img > "${OUT_DIR}/vbmeta.img"
 

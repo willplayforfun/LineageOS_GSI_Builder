@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Purpose: Initialise and sync the LineageOS repo source tree. Two-sync flow:
+# Purpose: Initialise and sync the LineageOS repo source tree. 
+
+# Two-sync flow:
 # first sync pulls the base tree + lineage_*_unified; we then extract the
 # upstream treble manifest from lineage_build_unified at the pinned SHA via
 # `git show`, generate zz-commit-pins.xml from config/pins.yaml, and second-sync
-# to pull the treble-specific projects and apply the pins. Finally reports
-# pin drift vs upstream.
+# to pull the treble-specific projects and apply the pins.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -14,15 +15,11 @@ echo "==> [00] Preparing LineageOS source tree"
 SRC_DIR="/srv/src"
 MANIFESTS_SRC="/opt/pipeline/config/local_manifests"
 MANIFESTS_DST="${SRC_DIR}/.repo/local_manifests"
-# Bash array (not a string) — we run with `IFS=$'\n\t'` which excludes space,
-# so word-splitting on a single-string command wouldn't produce separate argv
-# elements. `"${PINS_TOOL[@]}"` always expands correctly regardless of IFS.
+# Bash array (not a string) — `"${PINS_TOOL[@]}"` always expands correctly regardless of IFS.
 PINS_TOOL=(python3 /opt/pipeline/scripts/pins-tool.py)
 
 LINEAGE_URL="https://github.com/LineageOS/android.git"
 LINEAGE_BRANCH="lineage-20.0"
-# Fallback: if the branch HEAD is broken, replace LINEAGE_BRANCH above with a
-# known-good full commit SHA from https://github.com/LineageOS/android/commits/lineage-20.0
 
 NPROC="${NPROC:-$(nproc)}"
 SKIP_SYNC="${SKIP_SYNC:-0}"
@@ -92,10 +89,7 @@ fi
 mkdir -p "${MANIFESTS_DST}"
 
 # ─── Local manifests: committed XMLs ─────────────────────────────────────────
-# Copy every committed local manifest (today: andycgyan-unified.xml) from the
-# pipeline config dir into .repo/local_manifests/. zz-commit-pins.xml and
-# upstream-treble.xml are NOT committed — they're produced below after the
-# first sync.
+# Copy every committed local manifest from the pipeline config dir into .repo/local_manifests/
 echo "  -> Installing committed local manifests ..."
 shopt -s nullglob
 xmls=("${MANIFESTS_SRC}"/*.xml)
@@ -115,20 +109,15 @@ else
     done
 fi
 
+# Remove any stale zz-commit-pins.xml left by a previous run before syncing.
+rm -f "${MANIFESTS_DST}/zz-commit-pins.xml"
+
 # ─── First repo sync ─────────────────────────────────────────────────────────
-# Pulls the default LineageOS tree plus the two projects declared by
-# andycgyan-unified.xml (lineage_build_unified, lineage_patches_unified).
+# Pulls the default LineageOS tree plus the projects declared by the 
+# local manifests added above.
 # Doesn't yet apply pins (zz-commit-pins.xml not generated) or pull
 # treble-specific projects (upstream-treble.xml not installed) — both happen
 # in the second sync below.
-#
-# Remove any stale zz-commit-pins.xml left by a previous run before syncing.
-# If the pins have changed (e.g. switching from -light to -td), the old file
-# overrides andycgyan-unified.xml's branch declaration (zz-* sorts last) and
-# keeps lineage_build_unified on the obsolete SHA — causing the git show below
-# to fail because the new SHA isn't in the old clone. Deleting it here is safe:
-# the file is always regenerated from pins.yaml between the two syncs.
-rm -f "${MANIFESTS_DST}/zz-commit-pins.xml"
 
 if [[ "${SKIP_SYNC}" == "1" ]]; then
     echo "  -> SKIP_SYNC=1: first sync is local-only (working-tree reset, no fetch)."
@@ -140,12 +129,6 @@ run_repo_sync
 echo "  -> First sync complete."
 
 # ─── Extract upstream treble manifest at the pinned SHA ──────────────────
-# After the first sync, lineage_build_unified is on disk with its full branch
-# history. `git show <SHA>:path` extracts the file at the pinned commit —
-# regardless of where the working-tree HEAD landed — so the manifest is
-# deterministic against the pin and not against whatever default-branch tip
-# the sync happened to fetch. Single transport (git), content-addressed by
-# the pin SHA.
 PIN_LBU=$("${PINS_TOOL[@]}" field "lineage_build_unified" revision)
 UPSTREAM_TREBLE_FILE="${MANIFESTS_DST}/upstream-treble.xml"
 
@@ -161,25 +144,18 @@ echo "  -> Extracting upstream-treble.xml from lineage_build_unified at ${PIN_LB
 if ! git -C "${LBU_DIR}" show "${PIN_LBU}:local_manifests_treble/manifest.xml" \
         > "${UPSTREAM_TREBLE_FILE}.tmp" 2>/dev/null; then
     echo "ERROR: git show ${PIN_LBU}:local_manifests_treble/manifest.xml failed." >&2
-    echo "       The pinned SHA may not be reachable from the synced branch." >&2
     rm -f "${UPSTREAM_TREBLE_FILE}.tmp"
     exit 1
 fi
 mv "${UPSTREAM_TREBLE_FILE}.tmp" "${UPSTREAM_TREBLE_FILE}"
 
 # ─── Generate zz-commit-pins.xml from pins.yaml ──────────────────────────────
-# Single source of truth for pinned revisions; pins-tool.py emits the
-# repo-manifest form. Regenerated every run so a pins.yaml edit takes effect
-# on the next ./build.sh.
+# pins-tool.py emits the repo-manifest form. 
+# Regenerated every run so a pins.yaml edit takes effect on the next ./build.sh.
 #
 # The "zz-" prefix is load-bearing: repo processes .repo/local_manifests/*.xml
 # in alphabetical order, and our <remove-project> entries require the target
-# project to already be declared — which means this file MUST sort after both
-# andycgyan-unified.xml (declares lineage_*_unified) AND upstream-treble.xml
-# (declares TrebleDroid/vendor_hardware_overlay).
-#
-# One-time migration: clean up older filenames this manifest used to live at.
-rm -f "${MANIFESTS_DST}/commit-pins.xml" "${MANIFESTS_DST}/zz-pins.xml"
+# project to already be declared.
 
 echo "  -> Generating zz-commit-pins.xml from config/pins.yaml ..."
 "${PINS_TOOL[@]}" generate-manifest > "${MANIFESTS_DST}/zz-commit-pins.xml"
@@ -187,9 +163,7 @@ echo "  -> Generating zz-commit-pins.xml from config/pins.yaml ..."
 # ─── Second repo sync ────────────────────────────────────────────────────────
 # Now that both upstream-treble.xml and zz-commit-pins.xml are in place, this
 # sync resets the pinned projects to their pinned SHAs and pulls the
-# treble-specific projects declared by the upstream manifest (device/phh/treble,
-# vendor/hardware_overlay, packages/apps/QcRilAm, vendor/gapps). Incremental
-# for projects already cloned by the first sync — fast.
+# treble-specific projects declared by the upstream manifest.
 if [[ "${SKIP_SYNC}" == "1" ]]; then
     echo "  -> SKIP_SYNC=1: second sync is local-only (apply pins to working tree, no fetch)."
 else
@@ -199,9 +173,9 @@ run_repo_sync
 echo "  -> Second sync complete."
 
 # ─── Pin drift check ─────────────────────────────────────────────────────────
-# Iterates over every entry in pins.yaml — adding a pin is a config-only
-# change. For each, query the upstream branch HEAD and compare to the pinned
-# SHA. Purely an awareness signal; pins stay in effect until manually bumped.
+# Iterates over every entry in pins.yaml, see if they are out of date.
+# For each, query the upstream branch HEAD and compare to the pinned SHA. 
+# Purely an awareness signal; pins stay in effect until manually bumped.
 check_pin_drift() {
     local project_subpath="$1"
     local pinned_sha="$2"

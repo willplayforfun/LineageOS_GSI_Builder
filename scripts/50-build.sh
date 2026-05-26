@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Purpose: Apply lineage_patches_unified patches, lunch the microG wrapper
-# product, and build the unsigned target-files-package + otatools. Signing
-# happens in step 60; APEX key discovery happens in step 55.
+# product, and build the unsigned target-files-package + otatools.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -35,7 +34,8 @@ for path in \
 do
     if [[ ! -e "${path}" ]]; then
         echo "ERROR: required path missing: ${path}" >&2
-        echo "       Did step 00 (repo sync) complete?" >&2
+        echo "       A repo sync must succeed before patches can be applied." >&2
+        echo "       If you set SKIP_SYNC=1, run once without it first." >&2
         exit 1
     fi
 done
@@ -96,9 +96,7 @@ bash "${SRC_DIR}/device/phh/treble/generate.sh" lineage
 # AOSP's envsetup.sh assumes a relaxed shell: it references variables like TOP
 # and ZSH_VERSION without guards (fatal under `set -u`), and it relies on
 # default IFS to word-split space-joined variable lists into separate args for
-# `unset` (with our `IFS=$'\n\t'`, the whole blob becomes one token and bash
-# rejects it as "not a valid identifier"). Relax both for the source + lunch
-# block, then restore the script's safety net.
+# `unset`. Relax both for the source + lunch block, then restore the script's safety net.
 echo "  -> Sourcing build/envsetup.sh ..."
 _saved_ifs="$IFS"
 set +u
@@ -119,25 +117,18 @@ if [[ -d out/.module_paths ]]; then
 fi
 
 # ─── Lunch the microG wrapper product ───────────────────────────────────────
-# The wrapper (written by step 20) inherits device/phh/treble/lineage_arm64_bvN.mk
-# (generated above by generate.sh lineage) and layers vendor/microg/microg.mk
-# on top. See scripts/20-stage-vendor-microg.sh.
+# The wrapper (written by step 20) inherits the variant-specific makefile
+# from device/phh/treble/ (generated above by generate.sh lineage) and 
+# layers vendor/microg/microg.mk on top.
 echo "  -> Lunching ${LUNCH_TARGET} ..."
 lunch "${LUNCH_TARGET}"
 
 # ─── Build ──────────────────────────────────────────────────────────────────
-# `target-files-package` produces the unsigned target-files zip (consumed by
-# steps 55 and 60); `otatools` populates out/host/linux-x86/bin/ with
-# sign_target_files_apks (used by step 60). `make` is incremental, so re-runs
-# only rebuild what changed.
-#
-# Note: `make` here is the bash function defined by envsetup.sh, not /usr/bin/make.
-# It internally word-splits `$(get_make_command)` into `build/soong/soong_ui.bash
-# --make-mode`, so it needs default IFS too — keep the relaxed shell through this
-# call. Restored at the end for hygiene; nothing in this script runs after.
-# Size the persistent ccache volume. Android 13 generates 30-50 GB of ccache
-# data; the default 5 GB limit causes constant eviction and near-zero hit rates.
-# Calling -M on every run is safe — it is a fast metadata write and idempotent.
+# `target-files-package` produces the unsigned target-files zip.
+# `otatools` populates out/host/linux-x86/bin/ with sign_target_files_apks.
+# `make` is incremental, so re-runs only rebuild what changed.
+
+# Size the persistent ccache volume. Android 13 generates 30-50 GB of ccache data.
 "${CCACHE_EXEC}" -M 50G
 
 # installclean removes previously-installed files from $OUT before rebuilding,
@@ -146,6 +137,10 @@ lunch "${LUNCH_TARGET}"
 echo "  -> make installclean ..."
 make installclean
 
+# Note: `make` here is the bash function defined by envsetup.sh, not /usr/bin/make.
+# It internally word-splits `$(get_make_command)` into `build/soong/soong_ui.bash
+# --make-mode`, so it needs default IFS too — keep the relaxed shell through this
+# call. IFS and nounset are restored below once make completes.
 echo "  -> make -j${NPROC} target-files-package otatools ..."
 WITH_ADB_INSECURE=true make -j"${NPROC}" target-files-package otatools
 

@@ -25,8 +25,6 @@ mkdir -p /srv/intermediate
 date +%s > /srv/intermediate/.build-start-time
 
 # Run each numbered script in lexicographic (numeric) order.
-# Scripts not present in the image are silently skipped — this lets you test
-# a subset of the pipeline (e.g. only 00 + 99) without stub scripts.
 shopt -s nullglob
 scripts=("${PIPELINE_DIR}/scripts"/[0-9][0-9]-*.sh)
 shopt -u nullglob

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Purpose: Discover APEX modules in the unsigned target-files zip produced by
-# step 50 and generate 4096-bit SHA256_RSA keys for any not already present in
-# /srv/keys/apex/. Also writes the module list to /srv/intermediate/ so step 60
+# Purpose: Discover APEX modules in the newly-built unsigned target-files zip 
+# and generate 4096-bit SHA256_RSA keys for any not already present in /srv/keys/apex/. 
+# Also writes the module list to /srv/intermediate/ so step 60
 # can build sign_target_files_apks flags from the same enumeration.
 
 set -euo pipefail
@@ -22,14 +22,14 @@ if [[ "${SKIP_BUILD:-0}" == "1" ]]; then
     exit 0
 fi
 
-# ─── Locate the unsigned target-files zip from step 50 ───────────────────────
+# ─── Locate the unsigned target-files zip ───────────────────────
 shopt -s nullglob
 TF_ZIPS=("${SRC_DIR}"/out/target/product/*/obj/PACKAGING/target_files_intermediates/*-target_files-*.zip)
 shopt -u nullglob
 
 if [[ ${#TF_ZIPS[@]} -eq 0 ]]; then
     echo "ERROR: no unsigned target-files zip found under ${SRC_DIR}/out/." >&2
-    echo "       Step 50 must produce target-files-package before step 55 runs." >&2
+    echo "       A build must complete successfully before APEX keys can be generated." >&2
     exit 1
 fi
 # Pick the most recently modified one.
@@ -69,7 +69,7 @@ if [[ ${#APEX_MODULES[@]} -eq 0 ]]; then
 fi
 echo "  -> ${#APEX_MODULES[@]} APEX module(s) declared by the build."
 
-# Persist the list so step 60 builds its sign_target_files_apks flag set from
+# Persist the list so step 60 can build its sign_target_files_apks flag set from
 # exactly the same enumeration (and doesn't have to re-parse the zip).
 printf '%s\n' "${APEX_MODULES[@]}" > "${APEX_MODULES_LIST}"
 
@@ -83,8 +83,7 @@ SUBJECT_TEMPLATE="${SUBJECT_TEMPLATE%$'\n'}"
 
 # ─── Lazily stage a 4096-bit make_key ────────────────────────────────────────
 # Per the LineageOS wiki, APEX keys must be SHA256_RSA4096 rather than the
-# stock 2048-bit. Copy + sed once; stored under /srv/intermediate (regenerable
-# tooling, not key material).
+# stock 2048-bit. Copy script + sed once; stored under /srv/intermediate
 if [[ ! -x "${MAKE_KEY_4096}" ]]; then
     if [[ ! -x "${STOCK_MAKE_KEY}" ]]; then
         echo "ERROR: stock make_key not found at ${STOCK_MAKE_KEY}" >&2
@@ -122,8 +121,7 @@ for module in "${APEX_MODULES[@]}"; do
     # make_key refuses to overwrite, so clear any half-written leftovers.
     rm -f "${pk8}" "${pem_cert}"
     # AOSP make_key always exits 1 via its EXIT trap even on success; swallow
-    # the bogus exit and verify success by checking that the output files
-    # appeared. Same pattern as step 40.
+    # the bogus exit and verify success by checking that the output files appeared.
     "${MAKE_KEY_4096}" "${APEX_KEYS_DIR}/${module}" "${apex_subject}" </dev/null || true
     if [[ ! -f "${pk8}" || ! -f "${pem_cert}" ]]; then
         echo "ERROR: make_key did not produce ${module}.{pk8,x509.pem}" >&2

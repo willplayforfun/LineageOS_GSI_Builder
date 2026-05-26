@@ -109,6 +109,11 @@ fastboot -w
 fastboot reboot
 ```
 
+If flashing `vbmeta.img`:
+```bash
+fastboot --disable-verity --disable-verification flash vbmeta out/vbmeta.img
+```
+
 ### Getting a stock boot.img
 
 Two routes:

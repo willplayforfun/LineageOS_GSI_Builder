@@ -20,9 +20,7 @@ echo "==> [45] Staging vendor/lineage-priv/keys"
 mkdir -p "${STAGE_DIR}"
 
 # ─── Android.mk ──────────────────────────────────────────────────────────────
-# Minimal: declares LOCAL_PATH so this directory participates in any
-# all-subdir-makefiles walk. APEX certificate overrides go here if/when the
-# 4096-bit APEX key set is added (see step 40 note).
+# Declares LOCAL_PATH so this directory participates in any all-subdir-makefiles walk.
 # Written only if absent so a user-customised file is preserved across re-runs.
 if [[ ! -f "${STAGE_DIR}/Android.mk" ]]; then
     echo "  -> Writing Android.mk ..."
@@ -49,16 +47,15 @@ else
 fi
 
 # ─── Symlink each key file into the staging dir ──────────────────────────────
-# Symlink (not copy) so private key material lives only in /srv/keys/ — the
-# host-mounted volume the user is told to back up. ln -sf overwrites any
-# stale link/file at the destination, keeping the link target in sync.
+# Symlink (not copy) so private key material lives only in /srv/keys/. 
+# ln -sf overwrites any stale link/file at the destination, keeping the link target in sync.
 echo "  -> Symlinking *.pk8 / *.x509.pem from ${KEYS_DIR}/ ..."
 shopt -s nullglob
 keyfiles=("${KEYS_DIR}"/*.pk8 "${KEYS_DIR}"/*.x509.pem)
 shopt -u nullglob
 
 if [[ ${#keyfiles[@]} -eq 0 ]]; then
-    echo "ERROR: no *.pk8 or *.x509.pem in ${KEYS_DIR}. Run step 40 first." >&2
+    echo "ERROR: no *.pk8 or *.x509.pem in ${KEYS_DIR}." >&2
     exit 1
 fi
 
@@ -67,9 +64,8 @@ for src in "${keyfiles[@]}"; do
 done
 
 # ─── Symlink staging dir into the source tree ────────────────────────────────
-# /srv/src/vendor/lineage-priv/keys → /srv/intermediate/lineage-priv. Build
-# system then sees vendor/lineage-priv/keys/{Android.mk,keys.mk,releasekey.*}
-# transparently.
+# /srv/src/vendor/lineage-priv/keys → /srv/intermediate/lineage-priv. Build system 
+# then sees vendor/lineage-priv/keys/{Android.mk,keys.mk,releasekey.*} transparently.
 echo "  -> Symlinking ${STAGE_DIR} → ${SRC_LINK} ..."
 mkdir -p "${SRC_LINK_PARENT}"
 ln -sfn "${STAGE_DIR}" "${SRC_LINK}"

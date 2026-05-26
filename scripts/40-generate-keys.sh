@@ -9,10 +9,7 @@ SRC_DIR="/srv/src"
 SUBJECT_FILE="/opt/pipeline/config/cert-subject.txt"
 MAKE_KEY="${SRC_DIR}/development/tools/make_key"
 
-# Canonical LineageOS 20 cert set (per the wiki). Note: this v1 deliberately
-# omits the SHA256_RSA4096 APEX-specific keys required by some LineageOS 19.1+
-# configurations — if a build fails on missing APEX keys, follow the README
-# "Known issues" entry to copy make_key, sed 2048→4096, and regenerate.
+# Canonical LineageOS 20 cert set (per the wiki).
 CERTS=(
     bluetooth
     cyngn-app
@@ -50,7 +47,8 @@ SUBJECT="${SUBJECT%$'\n'}"
 
 if [[ ! -x "${MAKE_KEY}" ]]; then
     echo "ERROR: make_key not found or not executable at ${MAKE_KEY}" >&2
-    echo "       This script must run after step 00 has synced the source tree." >&2
+    echo "       A repo sync must succeed before keys can be generated." >&2
+    echo "       If you set SKIP_SYNC=1, run once without it first." >&2
     exit 1
 fi
 

@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
 # Purpose: Optionally produce a patched boot.img and/or vendor_boot.img for
 # devices where dm-verity enforcement lives in one or both images.
-#
-# On Android 12+ devices the device-specific fstab (which carries the verify/
-# avb mount options that engage dm-verity) lives in the vendor ramdisk inside
-# vendor_boot, not in boot's ramdisk. Both images should be patched.
-#
+
 # Implementation: run magiskboot on each supplied stock image. The "cpio patch"
 # command strips verify/avb/forceencrypt from fstab entries in the ramdisk, and
 # "repack" sets HASHTREE_DISABLED | VERIFICATION_DISABLED in the vbmeta footer.
 # magiskboot auto-detects the image type (BOOT vs VENDOR_BOOT) so the same
 # command sequence works for both.
-#
-# Each image is skipped silently if the corresponding file is absent from
-# /srv/boot_img/.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -122,10 +115,6 @@ fi  # end boot.img block
 
 # ════════════════════════════════════════════════════════════════════════════
 # PART 2 — vendor_boot.img
-# On Android 12+ the device-specific fstab (carrying verify/avb mount options)
-# lives in the vendor ramdisk here, not in boot. Patching this image strips
-# those options so fs_mgr won't try to set up dm-verity for the GSI system.
-# magiskboot auto-detects the VENDOR_BOOT image type.
 # ════════════════════════════════════════════════════════════════════════════
 if [[ ! -f "${VENDOR_BOOT_IN}" ]]; then
     echo "  -> No /srv/boot_img/vendor_boot.img present — skipping vendor_boot patch."

@@ -5,9 +5,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 SENTINEL="/srv/intermediate/.stage-10-done"
-# Array, not a string — we run with `IFS=$'\n\t'` (no space), so word-splitting
-# on a string variable would not produce separate argv elements. See the
-# matching note in 00-prep-source.sh.
+# Bash array (not a string) — `"${APKS_TOOL[@]}"` always expands correctly regardless of IFS.
 APKS_TOOL=(python3 /opt/pipeline/scripts/apks-tool.py)
 PREBUILTS_DIR="/srv/intermediate/vendor-microg/prebuilts"
 STRICT="${STRICT:-0}"
@@ -31,8 +29,7 @@ fi
 mkdir -p "${PREBUILTS_DIR}"
 
 # ─── Parse and download ───────────────────────────────────────────────────────
-# apks-tool.py emits one TSV row per APK (filename<TAB>url<TAB>sha256); the
-# YAML is the single source of truth, so no blank/comment handling needed.
+# apks-tool.py emits one TSV row per APK (filename<TAB>url<TAB>sha256); no blank/comment handling needed.
 while IFS=$'\t' read -r filename url sha256; do
     dest="${PREBUILTS_DIR}/${filename}"
 

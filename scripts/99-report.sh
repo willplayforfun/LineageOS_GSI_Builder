@@ -8,6 +8,7 @@ OUT_DIR="/srv/out"
 IMG="${OUT_DIR}/system.img"
 VBMETA="${OUT_DIR}/vbmeta.img"
 BOOT_PATCHED="${OUT_DIR}/boot-patched.img"
+VENDOR_BOOT_PATCHED="${OUT_DIR}/vendor_boot-patched.img"
 CERTS_DIR="${OUT_DIR}/certs"
 START_FILE="/srv/intermediate/.build-start-time"
 
@@ -35,12 +36,11 @@ echo ""
 if [[ -f "${IMG}" ]]; then
     IMG_SIZE="$(du -sh "${IMG}" | cut -f1)"
     IMG_SHA256="$(sha256sum "${IMG}" | awk '{print $1}')"
-    echo "  Image path : ${IMG}"
-    echo "  Image size : ${IMG_SIZE}"
+    echo "  system image path : ${IMG}"
+    echo "  system image size : ${IMG_SIZE}"
     echo "  SHA256     : ${IMG_SHA256}"
 else
-    echo "  Image path : NOT FOUND at ${IMG}"
-    echo "               (Expected when running only stage 00 for sync testing.)"
+    echo "  system image : NOT FOUND at ${IMG}"
 fi
 
 echo ""
@@ -53,7 +53,7 @@ if [[ -f "${VBMETA}" ]]; then
     echo "  vbmeta size: ${VBMETA_SIZE}"
     echo "  SHA256     : ${VBMETA_SHA256}"
 else
-    echo "  vbmeta.img : not present  (produced by step 62 on a full build)"
+    echo "  vbmeta : NOT FOUND at ${VBMETA}"
 fi
 
 echo ""
@@ -65,11 +65,23 @@ if [[ -f "${BOOT_PATCHED}" ]]; then
     echo "  boot path  : ${BOOT_PATCHED}"
     echo "  boot size  : ${BOOT_SIZE}"
     echo "  SHA256     : ${BOOT_SHA256}"
-    echo "               (AVB hashtree + verification disabled — flash as boot_a)"
 else
     echo "  boot-patched.img : not present"
-    echo "                     (drop a stock boot.img into ./boot_img/ to enable step 65)"
+    echo "                     (drop a stock boot.img into ./boot_img/ to enable)"
 fi
+
+# ─── Patched vendor_boot.img (optional, only if user supplied one) ──────────────────
+if [[ -f "${VENDOR_BOOT_PATCHED}" ]]; then
+    VENDOR_BOOT_SIZE="$(du -sh "${VENDOR_BOOT_PATCHED}" | cut -f1)"
+    VENDOR_BOOT_SHA256="$(sha256sum "${VENDOR_BOOT_PATCHED}" | awk '{print $1}')"
+    echo "  vendor boot path  : ${VENDOR_BOOT_PATCHED}"
+    echo "  vendor boot size  : ${VENDOR_BOOT_SIZE}"
+    echo "  SHA256     : ${VENDOR_BOOT_SHA256}"
+else
+    echo "  vendor_boot-patched.img : not present"
+    echo "                     (drop a stock vendor_boot.img into ./boot_img/ to enable)"
+fi
+
 
 echo ""
 
@@ -84,15 +96,5 @@ else
 fi
 
 echo ""
-
-# ─── Treble compatibility ─────────────────────────────────────────────────────
-echo "  Treble info:"
-echo "    Architecture  : arm64"
-echo "    Partition     : A/B, system-as-root"
-echo "    VNDK          : 33"
-echo "    Build variant : ${VARIANT:-64VN}"
-
-echo ""
-echo "  REMINDER: Back up ./keys/ if you plan to ship OTA updates to existing"
-echo "            installs. Private keys in ./keys/ must NEVER be committed to git."
+echo "  REMINDER: Back up ./keys/ if you plan to ship OTA updates to existing installs."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

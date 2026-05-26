@@ -3,10 +3,7 @@
 # build was previously invoked with sudo), then drops to the builder user.
 set -euo pipefail
 
-# Chown every top-level entry under /srv EXCEPT any that live on a read-only
-# filesystem (e.g. /srv/boot_img mounted with :ro). chown on a read-only mount
-# would error out and abort the container under `set -e`; we want those mounts
-# left exactly as-is since the pipeline reads from them but never writes.
+# Chown every top-level entry under /srv EXCEPT any that live on a read-only filesystem
 for entry in /srv/*; do
     [[ -e "${entry}" ]] || continue
     # `findmnt -no OPTIONS` returns the mount options if entry is a mountpoint,

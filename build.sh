@@ -10,11 +10,11 @@ IMAGE="lineage20-gsi-microg:latest"
 # ─── Defaults (all overridable via environment variables) ────────────────────
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
-NPROC="${NPROC:-$(nproc)}"
 SKIP_SYNC="${SKIP_SYNC:-0}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SIGNING="${SKIP_SIGNING:-0}"
 CLEAN="${CLEAN:-0}"
+NPROC="${NPROC:-$(nproc)}"
 VARIANT="${VARIANT:-64VN}"
 
 # ─── CLI flags (override env vars) ───────────────────────────────────────────

@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Purpose: Sign the unsigned target-files zip with our releasekey (incl. all
-# APEX modules discovered by step 55). Image extraction and cert publishing
-# happen in step 62 so that step can be run independently on a pre-existing
-# signed zip.
+# Purpose: Sign the unsigned target-files zip with our releasekey
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -15,8 +12,10 @@ APEX_MODULES_LIST="/srv/intermediate/apex-modules.txt"
 HOST_BIN="${SRC_DIR}/out/host/linux-x86/bin"
 
 # APKs that ship inside APEX containers but are regular APKs (not APEXes
-# themselves). Per the LineageOS wiki signing recipe, these are signed with
-# our standard releasekey — they do not need 4096-bit per-APEX keys.
+# themselves). sign_target_files_apks re-signs APKs via the target-files cert
+# mappings, but APKs embedded inside APEX containers are unreachable through
+# that path and must be listed explicitly with --extra_apks. These still use
+# our standard releasekey, not the 4096-bit per-APEX keys.
 APEX_APKS=(
     AdServicesApk
     FederatedCompute
@@ -45,7 +44,7 @@ shopt -u nullglob
 
 if [[ ${#TF_ZIPS[@]} -eq 0 ]]; then
     echo "ERROR: no unsigned target-files zip under ${SRC_DIR}/out/." >&2
-    echo "       Step 50 must produce one before step 60 runs." >&2
+    echo "       A build must complete successfully before signing can occur." >&2
     exit 1
 fi
 # Newest wins if more than one is present (incremental builds may leave the
@@ -62,7 +61,6 @@ echo "  -> Source target files: ${TF_ZIP}"
 SIGN_TOOL="${HOST_BIN}/sign_target_files_apks"
 if [[ ! -x "${SIGN_TOOL}" ]]; then
     echo "ERROR: ${SIGN_TOOL} not found." >&2
-    echo "       Step 50 must include 'otatools' in its make target." >&2
     exit 1
 fi
 # sign_target_files_apks shells out to aapt2 / zipalign / etc. which it
@@ -72,7 +70,7 @@ export PATH="${HOST_BIN}:${PATH}"
 # ─── Build sign_target_files_apks flag list ─────────────────────────────────
 FLAGS=()
 
-# APEX containers + payload keys (one pair per module discovered by step 55).
+# APEX containers + payload keys (one pair per module).
 if [[ -s "${APEX_MODULES_LIST}" ]]; then
     APEX_COUNT=0
     while IFS= read -r module; do
@@ -95,8 +93,8 @@ echo "  -> APEX-APK flags built for ${#APEX_APKS[@]} APK(s)."
 # ─── Sign ────────────────────────────────────────────────────────────────────
 mkdir -p "$(dirname "${SIGNED_TF}")"
 echo "  -> Signing target files → ${SIGNED_TF} ..."
-# --allow_gsi_debug_sepolicy: the upstream GSI product makefile
-# (device/phh/treble/lineage_arm64_bvN.mk) sets SELINUX_IGNORE_NEVERALLOWS
+# --allow_gsi_debug_sepolicy:
+# the upstream GSI product makefile sets SELINUX_IGNORE_NEVERALLOWS
 # and PRODUCT_INSTALL_DEBUG_POLICY_TO_SYSTEM_EXT unconditionally — both are
 # required for a GSI that must run on arbitrary vendor implementations and are
 # incompatible with the -user build variant. The GSI is therefore built as
