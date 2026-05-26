@@ -29,20 +29,20 @@ pins:
   - name: lineage_patches_unified
     path: lineage_patches_unified
     remote: andycgyan
-    revision: 1865fc784bc72a2d82fb938f18edb66af90ba306
+    revision: 5715ecd8ef00f97c5892b200761462fe3fae10ca
     upstream_url: https://github.com/AndyCGYan/lineage_patches_unified
-    tracking_branch: lineage-20-light
-    category: archival
-    note: AndyCGYan branch effectively dead since Nov 2023, drift is informational only
+    tracking_branch: lineage-20-td
+    category: frozen
+    note: pinned to -td branch HEAD as of 2026-05-26; advance when patch compat allows
 
   - name: lineage_build_unified
     path: lineage_build_unified
     remote: andycgyan
-    revision: ba21a0d381b988cef51387896a603cc2871045b8
+    revision: 3d2eaee78dd3629c0e80840ad6fe07663c23a297
     upstream_url: https://github.com/AndyCGYan/lineage_build_unified
-    tracking_branch: lineage-20-light
-    category: archival
-    note: AndyCGYan branch effectively dead since Nov 2023, drift is informational only
+    tracking_branch: lineage-20-td
+    category: frozen
+    note: pinned to -td branch HEAD as of 2026-05-26; advance when patch compat allows
 
   # Last commit before TrebleDroid started adding overlay entries that displace
   # the trailing context of AndyCGYan's 0001-Exclude-TrebleApp-co.patch.

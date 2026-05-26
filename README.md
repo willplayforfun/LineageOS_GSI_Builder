@@ -9,8 +9,8 @@ The output is a `system.img` file suitable for flashing to the
 unlocked bootloader, along with a `vbmeta.img` and/or optional patched `boot.img`
 that disables verity checks that would prevent the modified system image from loading. 
 
-This is roughly equivalent to AndyCGYan's `lineage_gsi_arm64_vN` target on the
-`lineage-20-light` branch, signed with self-generated release keys.
+This is roughly equivalent to AndyCGYan's `lineage_gsi_arm64_bvN` target on the
+`lineage-20-td` branch, signed with self-generated release keys.
 
 ---
 
@@ -84,7 +84,7 @@ these are safe to distribute and are used to verify the signed image.
 
 ## Caveats
 
-- The AndyCGYan `lineage-20-light` branches are no longer maintained, meaning some aspects of the build are frozen to past commits and may miss out on future security updates from LineageOS.
+- The pipeline pins `lineage_build_unified` and `lineage_patches_unified` to specific commits on the `-td` branch for build stability; advance the pins in `config/pins.yaml` when patch compatibility allows.
 
 ---
 

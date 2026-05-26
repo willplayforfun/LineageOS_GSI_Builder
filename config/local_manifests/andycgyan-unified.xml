@@ -2,7 +2,7 @@
 <manifest>
   <remote name="andycgyan" fetch="https://github.com/AndyCGYan" />
   <project path="lineage_build_unified"   name="lineage_build_unified"
-           remote="andycgyan" revision="lineage-20-light" />
+           remote="andycgyan" revision="lineage-20-td" />
   <project path="lineage_patches_unified" name="lineage_patches_unified"
-           remote="andycgyan" revision="lineage-20-light" />
+           remote="andycgyan" revision="lineage-20-td" />
 </manifest>

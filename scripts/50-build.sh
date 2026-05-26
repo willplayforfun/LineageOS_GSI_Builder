@@ -94,7 +94,7 @@ if [[ -d out/.module_paths ]]; then
 fi
 
 # ─── Lunch the microG wrapper product ───────────────────────────────────────
-# The wrapper inherits device/lineage/gsi/lineage_gsi_arm64_vN.mk (provided by
+# The wrapper inherits device/lineage/gsi/lineage_gsi_arm64_bvN.mk (provided by
 # AndyCGYan/android_device_lineage_gsi via the unified manifest) and layers
 # vendor/microg/microg.mk on top. See scripts/20-stage-vendor-microg.sh.
 echo "  -> Lunching ${LUNCH_TARGET} ..."
