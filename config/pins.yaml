@@ -49,7 +49,7 @@ pins:
   - name: TrebleDroid/vendor_hardware_overlay
     path: vendor/hardware_overlay
     remote: github
-    revision: 1bbceba47362299ae60cb96c08303fb5f930e853
+    revision: 03844015a871e71bedaa5a4e2cfd109d16c5aae3
     upstream_url: https://github.com/TrebleDroid/vendor_hardware_overlay
     tracking_branch: pie
     category: frozen
@@ -58,14 +58,12 @@ pins:
   # LineageOS branch tip drifted past the trailing context of AndyCGYan's
   # 0002-Disable-ADB-authentication patch on config/common.mk. Pinned to the
   # vendor_lineage HEAD as of Nov 19 2023 (contemporary with AndyCGYan's last
-  # patch refresh on lineage_patches_unified). This is the documented escape
-  # hatch from the tier doctrine above — adding a pin to an otherwise-tracked
-  # LineageOS project when its patches start failing.
+  # patch refresh on lineage_patches_unified).
   - name: LineageOS/android_vendor_lineage
     path: vendor/lineage
     remote: github
-    revision: 142f7082c6d9e7c5f37a08e319283321dc6baf7d
+    revision: e8743e76318fcb69ef256df056733717f51e2dd5
     upstream_url: https://github.com/LineageOS/android_vendor_lineage
     tracking_branch: lineage-20.0
     category: frozen
-    note: pinned to AndyCGYan patch-refresh era to keep Disable-ADB-authentication applicable; trades vendor_lineage updates for build stability
+    note: pinned to age of last AndyCGYan GSI build (known good) 
