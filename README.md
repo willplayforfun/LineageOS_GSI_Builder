@@ -98,15 +98,29 @@ Flashing a GSI without also disabling verity there gets you stuck at
 "Can't load Android system. Your data may be corrupt." in recovery.
 
 If you drop a stock `boot.img` for your device into `./boot_img/boot.img`,
-the pipeline runs an extra step (`65-patch-boot.sh`) that:
+the pipeline runs an extra step (`65-patch-boot.sh`) that produces a
+patched boot image equivalent to what Magisk's "Select and Patch a File"
+app workflow generates — but headlessly, inside the container.
 
-1. Copies the file (the input is never modified).
-2. Locates the AVB footer (last 64 bytes, `AVBf` magic) and the vbmeta
-   header it points to.
-3. Sets `HASHTREE_DISABLED` and `VERIFICATION_DISABLED` in the vbmeta
-   flags field — the same bits `fastboot --disable-verity
-   --disable-verification flash` sets at flash time.
-4. Writes the result to `out/boot-patched.img`.
+Under the hood the step calls `magiskboot` (the same native binary the
+Magisk app uses) and runs three commands:
+
+1. **`magiskboot unpack boot.img`** — splits the image into `kernel`,
+   `ramdisk.cpio`, and (if present) `dtb`.
+2. **`magiskboot cpio ramdisk.cpio "patch"`** — strips `verify`, `avb`,
+   `verifyatboot`, `forceencrypt`, and related options from `fstab.*`
+   inside the ramdisk, so `fs_mgr` does not try to engage dm-verity on
+   `system` at mount time.
+3. **`magiskboot repack boot.img new-boot.img`** — rebuilds the image
+   and sets `HASHTREE_DISABLED | VERIFICATION_DISABLED` (0x3) in the
+   vbmeta footer flags. The same bits `fastboot --disable-verity
+   --disable-verification flash` writes at flash time.
+
+The result is written to `out/boot-patched.img`. The vbmeta signature
+inside the patched image no longer verifies — that's expected. On an
+unlocked bootloader (which you already need for any of this) the
+signature mismatch is downgraded to a warning, and the kernel still
+honors the disabled-flag bits and the cleaned fstab.
 
 Flash it alongside your `system.img`:
 
@@ -117,10 +131,10 @@ fastboot -w
 fastboot reboot
 ```
 
-The patched image's signature no longer verifies — that's expected. On an
-unlocked bootloader (which you already need for any of this) the signature
-mismatch is downgraded to a warning, and the kernel still honors the
-disabled-flag bits.
+The `magiskboot` binary is installed into the Docker image at build
+time, extracted from the official Magisk APK release on GitHub. To pin
+a different Magisk version (default is `v30.7`), pass `MAGISK_VERSION`
+as a Docker build arg.
 
 ### Getting a stock boot.img
 
@@ -134,12 +148,14 @@ Two routes:
   from your manufacturer. For Unihertz/MTK devices this is an SP Flash
   Tool package — `boot.img` is a top-level file inside.
 
-If the resulting file is not where verity lives on your device, step 65
-will error with a hint. Inspect with `avbtool info_image --image boot.img`
-to see whether there's an AVB footer at all.
+If `magiskboot unpack` reports no `ramdisk.cpio`, your device may use
+an `init_boot` partition instead (Android 13+ split-boot layout). In
+that case dump `init_boot_a` rather than `boot_a` and place it as
+`./boot_img/boot.img`. Inspect with `avbtool info_image --image
+boot.img` if you want to see the AVB descriptors before patching.
 
-The `./boot_img/` directory is gitignored — OEM firmware should never be
-committed.
+The `./boot_img/` directory is gitignored — OEM firmware should never
+be committed.
 
 ---
 
@@ -194,7 +210,7 @@ VARIANT=64VS ./build.sh   # arm64, vanilla, with su (superuser)
 | `55-generate-apex-keys.sh` | Discover APEX modules in the unsigned target files and mint 4096-bit APEX keys on demand |
 | `60-sign.sh` | Sign target files (incl. discovered APEXes) and extract `system.img` |
 | `62-extract-images.sh` | Extract `system.img` and `vbmeta.img` from the signed target-files zip and publish certs |
-| `65-patch-boot.sh` | (Optional) Patch a stock boot.img dropped into `./boot_img/` to disable AVB verity, for devices without a `vbmeta` partition |
+| `65-patch-boot.sh` | (Optional) Patch a stock boot.img dropped into `./boot_img/` via `magiskboot` — strips verity from fstab and disables AVB flags |
 | `99-report.sh` | Print build summary |
 
 > **Current status**: All scripts above are implemented. The pipeline has not

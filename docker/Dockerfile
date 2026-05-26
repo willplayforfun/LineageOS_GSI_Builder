@@ -79,6 +79,20 @@ RUN curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo \
         -o /usr/local/bin/repo \
     && chmod a+x /usr/local/bin/repo
 
+# Install magiskboot, extracted from the Magisk APK. The APK ships native
+# binaries as `lib/<abi>/libmagiskboot.so` (.so extension is Android packaging
+# camouflage so the APK installer extracts them — they are standalone ELFs).
+# We pull the x86_64 build to match the container architecture and drop it
+# into /usr/local/bin so 65-patch-boot.sh can call it directly.
+ARG MAGISK_VERSION=v30.7
+RUN set -eux \
+    && curl -fsSL -o /tmp/magisk.apk \
+        "https://github.com/topjohnwu/Magisk/releases/download/${MAGISK_VERSION}/Magisk-${MAGISK_VERSION}.apk" \
+    && unzip -j /tmp/magisk.apk "lib/x86_64/libmagiskboot.so" -d /tmp/ \
+    && mv /tmp/libmagiskboot.so /usr/local/bin/magiskboot \
+    && chmod a+x /usr/local/bin/magiskboot \
+    && rm /tmp/magisk.apk
+
 # Initialise git-lfs system-wide (LineageOS manifest fetches LFS objects).
 RUN git lfs install --system
 
