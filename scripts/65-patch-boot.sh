@@ -146,10 +146,8 @@ mkdir -p "${VENDOR_WORK_DIR}" "${OUT_DIR}"
 cp "${VENDOR_BOOT_IN}" "${VENDOR_WORK_DIR}/vendor_boot.img"
 
 echo "  -> magiskboot unpack ..."
+# magiskboot exits non-zero for vendor_boot images even on success; suppress it.
 ( cd "${VENDOR_WORK_DIR}" && "${MAGISKBOOT}" unpack vendor_boot.img ) || true
-echo "  -> unpack exit code: $?"
-echo "  -> work dir contents after unpack:"
-find "${VENDOR_WORK_DIR}" -not -name 'vendor_boot.img' | sort | sed 's/^/       /'
 
 # v3 extracts ramdisk.cpio at the top level; v4 extracts into vendor_ramdisk/
 # (possibly with multiple cpio files inside). Search the whole work tree.
@@ -159,7 +157,8 @@ mapfile -t VENDOR_RAMDISKS < <(
 
 if [[ ${#VENDOR_RAMDISKS[@]} -eq 0 ]]; then
     echo "ERROR: magiskboot did not produce a ramdisk.cpio from vendor_boot.img." >&2
-    echo "       Files found in work dir listed above." >&2
+    echo "       Work dir contents:" >&2
+    find "${VENDOR_WORK_DIR}" -not -name 'vendor_boot.img' | sort | sed 's/^/       /' >&2
     exit 1
 fi
 
