@@ -69,10 +69,14 @@ done
 # ─── Optionally wipe output dirs ─────────────────────────────────────────────
 if [[ "${CLEAN}" == "1" ]]; then
     echo "==> CLEAN=1: wiping out/ and intermediate/ ..."
-    rm -rf "${SCRIPT_DIR:?}/out"
-    mkdir -p "${SCRIPT_DIR}/out"
-    rm -rf "${SCRIPT_DIR:?}/intermediate"
-    mkdir -p "${SCRIPT_DIR}/intermediate"
+    # Run cleanup inside the container as root so we can remove files regardless
+    # of what UID created them (output files are owned by the container's builder user).
+    docker run --rm \
+        --entrypoint /bin/bash \
+        -u root \
+        -v "${SCRIPT_DIR}/out:/srv/out" \
+        -v "${SCRIPT_DIR}/intermediate:/srv/intermediate" \
+        "${IMAGE}" -c "find /srv/out /srv/intermediate -mindepth 1 -delete"
 fi
 
 # ─── Run container ───────────────────────────────────────────────────────────
