@@ -88,7 +88,7 @@ fi
 # These files are untracked, so they survive incremental builds but are wiped
 # by repo sync resets — always regenerate here so lunch can find the product.
 echo "  -> Generating device/phh/treble product makefiles ..."
-bash "${SRC_DIR}/device/phh/treble/generate.sh" lineage
+(cd "${SRC_DIR}/device/phh/treble" && bash generate.sh lineage)
 
 # ─── Source envsetup ────────────────────────────────────────────────────────
 # Sourced after patches in case any patch modifies envsetup itself.
