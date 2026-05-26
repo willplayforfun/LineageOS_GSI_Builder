@@ -44,6 +44,19 @@ pins:
     category: frozen
     note: pinned to -td branch HEAD as of 2026-05-26; advance when patch compat allows
 
+  # Commit bc042ba81e (2024-11-30, "Add option to secure adb") adds a new property
+  # to MiscSettings.kt that shifts the line-21 context expected by AndyCGYan's
+  # 0001-Remove-Securize-2-2.patch (written 2024-08-24). Pinned to the commit
+  # immediately before that addition.
+  - name: TrebleDroid/treble_app
+    path: treble_app
+    remote: github
+    revision: 0ce7c2e7d5fbda269a798fb95a4c22b94b2f5d85
+    upstream_url: https://github.com/TrebleDroid/treble_app
+    tracking_branch: master
+    category: frozen
+    note: newer commits shift MiscSettings.kt context; advance only after refreshing the Remove-Securize patch
+
   # Last commit before TrebleDroid started adding overlay entries that displace
   # the trailing context of AndyCGYan's 0001-Exclude-TrebleApp-co.patch.
   - name: TrebleDroid/vendor_hardware_overlay
