@@ -9,7 +9,7 @@ IFS=$'\n\t'
 SRC_DIR="/srv/src"
 PATCHES_SCRIPT="${SRC_DIR}/lineage_build_unified/apply_patches.sh"
 PATCHES_DIR="${SRC_DIR}/lineage_patches_unified"
-LUNCH_TARGET="lineage_gsi_arm64_vN_microg-userdebug"
+LUNCH_TARGET="lineage_gsi_arm64_bvN_microg-userdebug"
 NPROC="${NPROC:-$(nproc)}"
 # Shared with 00-prep-source.sh: records the lineage_patches_unified HEAD SHA
 # after a successful apply. Both scripts check this to avoid redundant resets.
