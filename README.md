@@ -1,19 +1,22 @@
-# LineageOS 20 GSI Builder (arm64, microG)
+# LineageOS 20 GSI Builder
 
 Produces a signed LineageOS 20 (Android 13) Generic System Image for arm64 with
 microG GmsCore, FakeStore, F-Droid, and Aurora Store pre-installed as privileged
-apps. The entire build runs inside Docker so the host stays clean.
+apps. The entire build runs inside Docker.
 
-The output is a single `system.img` (sparse Android image) suitable for flashing
-to the `system` partition of any Treble-compliant arm64 A/B device with an
-unlocked bootloader — equivalent to AndyCGYan's `lineage_gsi_arm64_vN` target on the
+The output is a `system.img` file suitable for flashing to the 
+`system` partition of any Treble-compliant arm64 A/B device with an
+unlocked bootloader, along with a `vbmeta.img` and/or optional patched `boot.img`
+that disables verity checks that would prevent the modified system image from loading. 
+
+This is roughly equivalent to AndyCGYan's `lineage_gsi_arm64_vN` target on the
 `lineage-20-light` branch, signed with self-generated release keys.
 
 ---
 
 ## Prerequisites
 
-- **Host OS**: Ubuntu 20.04 VM (or WSL2 with Docker Desktop on Windows)
+- **Host OS**: Theoretically works on any Docker-enabled computer, however it was tested primarily inside an Ubuntu 20.04 VM.
 - **Docker**: Docker Engine 20.10+ or Docker Desktop
 - **Disk**: ≥ 300 GB free (source tree ~250 GB, build output ~30 GB, ccache ~50 GB)
 - **RAM**: ≥ 16 GB (32 GB strongly recommended; the linker will OOM with less)
@@ -25,18 +28,20 @@ unlocked bootloader — equivalent to AndyCGYan's `lineage_gsi_arm64_vN` target 
 ## Quick start
 
 ```bash
-git clone https://github.com/your-org/lineageos-gsi-builder
+git clone https://github.com/willplayforfun/LineageOS_GSI_Builder.git
 cd lineageos-gsi-builder
 ./build.sh
 ```
 
 On the **first run** `build.sh` will:
 
-1. Build the Docker image (`lineage20-gsi-microg:latest`) from `docker/Dockerfile`.
+1. Build the Docker image from `docker/Dockerfile`.
 2. Create `src/`, `ccache/`, `keys/`, `intermediate/`, and `out/` on the host.
 3. Inside the container, initialise the repo tree and sync ~250 GB of source.
-4. Generate a full set of LineageOS release-signing keys in `./keys/` (first run only).
-5. Build the GSI, sign it, and write `out/system.img` plus public certs to `out/certs/`.
+4. Generate a full set of release-signing keys in `keys/` (first run only).
+5. Build the GSI.
+6. Sign the built image.
+7. Write `system.img` and `vbmeta.img` to `out/`, plus public certs to `out/certs/`.
 
 On **subsequent runs** the sync is incremental, keys are reused, and ccache cuts
 compile time dramatically.
@@ -46,6 +51,8 @@ compile time dramatically.
 | Variable / flag | Default | Effect |
 |---|---|---|
 | `SKIP_SYNC=1` / `--skip-sync` | `0` | Local-only `repo sync` (no network; resets working trees to manifest revision but skips fetches — useful for iteration) |
+| `SKIP_BUILD=1` / `--skip-build` | `0` | Useful if you have problems with post-build steps and need to iterate faster. |
+| `SKIP_SIGNING=1` / `--skip-signing` | `0` | Useful if you have problems with post-signing steps and need to iterate faster. |
 | `CLEAN=1` / `--clean` | `0` | Wipe `out/` and `intermediate/` before starting |
 | `NPROC=N` / `--nproc=N` | all cores | Parallelism for sync and build |
 | `VARIANT=…` / `--variant=…` | `64VN` | Build flavour (see Customisation below) |
@@ -62,30 +69,22 @@ SKIP_SYNC=1 NPROC=8 ./build.sh
 
 ## Reusing signing keys
 
-The `./keys/` directory is preserved between runs. On the first run the pipeline
-generates a full LineageOS key set; on all subsequent runs those keys are reused
+The `keys/` directory is preserved between runs. On the first run the pipeline
+generates a full signing key set; on all subsequent runs those keys are reused
 automatically.
 
-**If you plan to ship OTA updates to devices already running this build, you MUST
-back up `./keys/` privately and securely.** Losing the keys means you cannot sign
-future OTA packages that will be accepted by existing installations.
+If you plan to generate OTA (over-the-air) updates, you must back up `keys/`. 
+Losing the keys means you cannot sign future OTA packages, preventing them from being
+accepted by existing installations.
 
-- **Never commit `./keys/` to git** — it is listed in `.gitignore`.
-- Store the backup somewhere off the build machine (encrypted storage,
-  password manager with file attachment, etc.).
-- The `out/certs/` directory contains only the public `.x509.pem` certificates —
-  these are safe to distribute and are used to verify the signed image.
+The `out/certs/` directory contains only the public `.x509.pem` certificates —
+these are safe to distribute and are used to verify the signed image.
 
 ---
 
 ## Caveats
 
-- **Branch maintenance**: The `lineage-20-light` branch may not receive security
-  patches indefinitely. Check the AndyCGYan repository for branch status before
-  relying on this for production use.
-- **AuroraStore URL**: The AuroraStore download URL in `config/microg-apks.yaml` may
-  become stale when new versions are released. Update it to the latest stable
-  release from the AuroraOSS website.
+- The AndyCGYan `lineage-20-light` branches are no longer maintained, meaning some aspects of the build are frozen to past commits and may miss out on future security updates from LineageOS.
 
 ---
 
@@ -94,47 +93,21 @@ future OTA packages that will be accepted by existing installations.
 Some devices — notably MediaTek-based phones like the Unihertz Jelly Star —
 don't expose a standalone `vbmeta` partition. On those, the dm-verity root
 hash for `system` is chain-loaded from the **boot** image's AVB footer.
-Flashing a GSI without also disabling verity there gets you stuck at
-"Can't load Android system. Your data may be corrupt." in recovery.
+You cannot boot a flashed GSI without also disabling verity checks.
 
-If you drop a stock `boot.img` for your device into `./boot_img/boot.img`,
-the pipeline runs an extra step (`65-patch-boot.sh`) that produces a
-patched boot image equivalent to what Magisk's "Select and Patch a File"
-app workflow generates — but headlessly, inside the container.
+If you drop a stock `boot.img` and/or `vendor_boot.img` for your device 
+into `boot_img/`, the pipeline runs an extra step that produces a
+patched boot image equivalent to patching via Magisk.
 
-Under the hood the step calls `magiskboot` (the same native binary the
-Magisk app uses) and runs three commands:
-
-1. **`magiskboot unpack boot.img`** — splits the image into `kernel`,
-   `ramdisk.cpio`, and (if present) `dtb`.
-2. **`magiskboot cpio ramdisk.cpio "patch"`** — strips `verify`, `avb`,
-   `verifyatboot`, `forceencrypt`, and related options from `fstab.*`
-   inside the ramdisk, so `fs_mgr` does not try to engage dm-verity on
-   `system` at mount time.
-3. **`magiskboot repack boot.img new-boot.img`** — rebuilds the image
-   and sets `HASHTREE_DISABLED | VERIFICATION_DISABLED` (0x3) in the
-   vbmeta footer flags. The same bits `fastboot --disable-verity
-   --disable-verification flash` writes at flash time.
-
-The result is written to `out/boot-patched.img`. The vbmeta signature
-inside the patched image no longer verifies — that's expected. On an
-unlocked bootloader (which you already need for any of this) the
-signature mismatch is downgraded to a warning, and the kernel still
-honors the disabled-flag bits and the cleaned fstab.
-
-Flash it alongside your `system.img`:
+Flash them alongside your `system.img`:
 
 ```bash
 fastboot flash boot_a out/boot-patched.img
+fastboot flash vendor_boot_a out/vendor_boot-patched.img
 fastboot flash system_a out/system.img
 fastboot -w
 fastboot reboot
 ```
-
-The `magiskboot` binary is installed into the Docker image at build
-time, extracted from the official Magisk APK release on GitHub. To pin
-a different Magisk version (default is `v30.7`), pass `MAGISK_VERSION`
-as a Docker build arg.
 
 ### Getting a stock boot.img
 
@@ -145,17 +118,8 @@ Two routes:
   `dd if=/dev/block/by-name/boot_a of=/sdcard/boot.img bs=4M` and
   `adb pull /sdcard/boot.img`.
 - **Extract from OEM firmware**: download the stock firmware package
-  from your manufacturer. For Unihertz/MTK devices this is an SP Flash
+  from your manufacturer. For MediaTek devices this is an SP Flash
   Tool package — `boot.img` is a top-level file inside.
-
-If `magiskboot unpack` reports no `ramdisk.cpio`, your device may use
-an `init_boot` partition instead (Android 13+ split-boot layout). In
-that case dump `init_boot_a` rather than `boot_a` and place it as
-`./boot_img/boot.img`. Inspect with `avbtool info_image --image
-boot.img` if you want to see the AVB descriptors before patching.
-
-The `./boot_img/` directory is gitignored — OEM firmware should never
-be committed.
 
 ---
 
@@ -163,37 +127,15 @@ be committed.
 
 ### Changing microG / FLOSS app versions
 
-Edit `config/microg-apks.yaml`. Each entry under `apks:` carries `module`,
-`filename`, `url`, `sha256`, `certificate` (`platform` or `PRESIGNED`),
-`privileged`, and a free-text `note`. The `sha256` field defaults to `SKIP`
-to keep the build from breaking when upstream bumps versions; for production
-use, replace `SKIP` with the actual 64-char hex digest.
+Adding a new APK is a YAML-only edit; modify `config/microg-apks.yaml`. 
+The `sha256` field defaults to `SKIP` to keep the build from breaking 
+when upstream bumps versions; if you want, replace `SKIP` with the actual 64-char hex digest.
 
-Adding a new APK is a YAML-only edit — `scripts/apks-tool.py` regenerates the
-downloads list and the `vendor/microg/{Android.mk,microg.mk}` files
-automatically on the next build.
 
 ### Changing the X.509 certificate subject
 
-Edit `config/cert-subject.txt`. The default is:
-
-```
-/C=US/ST=California/L=Mountain View/O=LineageOS GSI Builder/OU=Android/CN=LineageOS
-```
-
-This only affects newly generated keys. If `./keys/` is already populated the
-subject line is ignored.
-
-### Changing the build variant
-
-Set `VARIANT` when invoking `build.sh`:
-
-```bash
-VARIANT=64VS ./build.sh   # arm64, vanilla, with su (superuser)
-```
-
-> **Note**: `GAPPS` variants (`G`) include Google Play Services, which conflicts
-> with microG. Use vanilla variants (`V`) for this pipeline.
+Edit `config/cert-subject.txt`. This only affects newly generated keys. 
+If `keys/` is already populated the subject line is ignored.
 
 ---
 
@@ -210,7 +152,7 @@ VARIANT=64VS ./build.sh   # arm64, vanilla, with su (superuser)
 | `55-generate-apex-keys.sh` | Discover APEX modules in the unsigned target files and mint 4096-bit APEX keys on demand |
 | `60-sign.sh` | Sign target files (incl. discovered APEXes) and extract `system.img` |
 | `62-extract-images.sh` | Extract `system.img` and `vbmeta.img` from the signed target-files zip and publish certs |
-| `65-patch-boot.sh` | (Optional) Patch a stock boot.img dropped into `./boot_img/` via `magiskboot` — strips verity from fstab and disables AVB flags |
+| `65-patch-boot.sh` | (Optional) Use `magiskboot` to patch a stock boot.img and/or vendor_boot.img dropped into `boot_img/` — strips verity from fstab and disables AVB flags |
 | `99-report.sh` | Print build summary |
 
 > **Current status**: All scripts above are implemented. The pipeline has not
