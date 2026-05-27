@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 # Flash a LineageOS GSI build to an A/B device via fastboot.
-# Usage: ./flash.sh [OUT_DIR]
+# Usage: ./flash.sh [--no-reboot] [OUT_DIR]
 #   OUT_DIR defaults to ./out relative to this script.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUT="${1:-$SCRIPT_DIR/out}"
+
+NO_REBOOT=false
+for arg in "$@"; do
+    case "$arg" in
+        --no-reboot) NO_REBOOT=true ;;
+        *) OUT="$arg" ;;
+    esac
+done
+OUT="${OUT:-$SCRIPT_DIR/out}"
 SYSTEM_IMG="$OUT/system.img"
 BOOT_IMG="$OUT/boot-patched.img"
 VENDOR_BOOT_IMG="$OUT/vendor_boot-patched.img"
@@ -49,8 +57,12 @@ fi
 echo "==> Wiping userdata/cache/metadata (errors about missing partitions are normal)..."
 fastboot -w || true
 
-echo "==> Rebooting..."
-run_fastboot reboot
-
-echo ""
-echo "Done. Your device is rebooting into the new system."
+if [ "$NO_REBOOT" = true ]; then
+    echo ""
+    echo "Done. Device is still in fastboot mode (--no-reboot was passed)."
+else
+    echo "==> Rebooting..."
+    run_fastboot reboot
+    echo ""
+    echo "Done. Your device is rebooting into the new system."
+fi

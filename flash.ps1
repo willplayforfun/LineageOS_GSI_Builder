@@ -4,12 +4,16 @@
     Flash a LineageOS GSI build to an A/B device via fastboot.
 .PARAMETER Out
     Path to the build output directory. Defaults to .\out relative to this script.
+.PARAMETER NoReboot
+    Skip the final reboot, leaving the device in fastboot mode.
 .EXAMPLE
     .\flash.ps1
     .\flash.ps1 -Out C:\builds\lineage\out
+    .\flash.ps1 -NoReboot
 #>
 param(
-    [string]$Out
+    [string]$Out,
+    [switch]$NoReboot
 )
 
 if (-not $Out) {
@@ -67,8 +71,12 @@ Write-Host "==> Wiping userdata/cache/metadata (errors about missing partitions 
 & fastboot -w
 # Not checking exit code -- partition absence is normal on some devices.
 
-Write-Host "==> Rebooting..."
-Invoke-Fastboot "reboot"
-
-Write-Host ""
-Write-Host "Done. Your device is rebooting into the new system."
+if ($NoReboot) {
+    Write-Host ""
+    Write-Host "Done. Device is still in fastboot mode (-NoReboot was passed)."
+} else {
+    Write-Host "==> Rebooting..."
+    Invoke-Fastboot "reboot"
+    Write-Host ""
+    Write-Host "Done. Your device is rebooting into the new system."
+}
