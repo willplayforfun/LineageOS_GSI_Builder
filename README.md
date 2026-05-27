@@ -55,7 +55,6 @@ compile time dramatically.
 | `SKIP_SIGNING=1` / `--skip-signing` | `0` | Useful if you have problems with post-signing steps and need to iterate faster. |
 | `CLEAN=1` / `--clean` | `0` | Wipe `out/` and `intermediate/` before starting |
 | `NPROC=N` / `--nproc=N` | all cores | Parallelism for sync and build |
-| `VARIANT=…` / `--variant=…` | `64VN` | Build flavour (see Customisation below) |
 
 ```bash
 # Example: re-run without syncing, using 8 cores
@@ -64,6 +63,24 @@ SKIP_SYNC=1 NPROC=8 ./build.sh
 # Or via flags:
 ./build.sh --skip-sync --nproc=8
 ```
+
+## Flashing the image
+
+"Flashing" is the process of installing the built image onto the phone. While this deserves a more fleshed out guide, in summary:
+ - Unlock the phone's bootloader
+ - Boot into "fastboot" mode
+ - Run the flash script (`flash.sh` or `flash.ps1`)
+
+### Restoring the stock firmware
+
+In case of an issue, you can restore your phone to factory condition. 
+For a Unihertz device, follow this guide: `https://www.reddit.com/r/unihertz/comments/1dzb98g/jelly_star_how_to_reinstall_stock_firmware_after/`.
+Roughly:
+ - Install Mediatek USB VCOM drivers from `https://www.hovatek.com/forum/thread-16640.html`.
+ - Download SP Flash Tool v6 from `https://spflashtools.com/`.
+ - Download stock firmware. For Unihertz, it is hosted here: `https://drive.google.com/drive/folders/0By1nhWOmuw2KdDhTUlFOZHpXQjg?resourcekey=0-KHJPIYVPw2iHL--cceWyaw`
+ - Unzip the archive, and load the flash.xml file in SPFT.
+ - Hit "Download" and reboot the phone.
 
 ---
 
@@ -143,6 +160,29 @@ Edit `config/cert-subject.txt`. This only affects newly generated keys.
 If `keys/` is already populated the subject line is ignored.
 
 ---
+
+## Conceptual reference
+
+There are several layers being combined here to produce a build:
+ - AOSP: the "base version" of Android; open-source, and no Google-specific stuff.
+ - LineageOS: a version of Android based off AOSP that adds some additional features and patches on top to create a fully-fledged OS experience.
+ - Treble: name for Android architecture of versions 8+; it is separated into separate parts, allowing a generic "system image" to (theoretically) be combined with separate device-specific firmware.
+ - TrebleDroid: a project that patches AOSP to work as a GSI on many different types of devices, as device manufacturers do not necessarily release fully Treble-compliant firmware/hardware.
+ - phh: a developer (Pierre-Hugues Husson) who created and maintained a patch set that allows TrebleDroid to be used with non-AOSP Android versions, such as LineageOS.
+ - AndyCGYan: a developer (Andy Yan) who created and maintained a patch set and build tools to specifically produce LineageOS GSIs.
+
+However, AndyCGYan's build tools do not support integrating the following elements into a LineageOS GSI:
+ - microG: an open-source implementation of "Google Play Services" library, which provides functionality like geolocation and push notifications to many apps.
+ - F-Droid: an alternative "app store" that hosts free open-source apps.
+ - Aurora Store: an app that allows access to the Google Play Store without logging in with a Google account.
+
+Those three elements allow the majority of apps to be accessed and used without logging into a Google account on the phone, and without installing Google software which violates privacy.
+
+### Pinning
+
+Since so many layers of patches are combined, sometimes the layers conflict. This is because "upstream" layers like LineageOS may be updated, and AndyCGYan or phh may not maintain their patchset, especially for an older version like LineageOS 20. When a conflict emerges, the two options are: (A) resolve the conflict personally, or (B) do not accept the new changes which create the conflict. "Pinning" is the process of choosing which version of changes to use, in order to prevent future changes from introducing a conflict.
+
+Fortunately, the Android codebase is split into many separate projects, and so only small parts of it need to be pinned as conflicts arise. See pins.yaml -- so far only 3 projects have been pinned due to introducing conflicts for the latest AndyCGYan patchset (which I've pinned simply for reproducibility). If new conflicts arise in the future (e.g. due to security updates), more pins can be introduced to keep this build functioning. The process is relatively simple: find the repo that introduces the change causing the conflict, find the SHA hash of the commit *before* that change is introduced, and pin the repo to that SHA.
 
 ## Pipeline script reference
 

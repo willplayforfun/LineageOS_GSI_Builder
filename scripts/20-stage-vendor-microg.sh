@@ -12,7 +12,6 @@ IFS=$'\n\t'
 INTERMEDIATE_DIR="/srv/intermediate/vendor-microg"
 VENDOR_DIR="/srv/src/vendor/microg"
 APKS_TOOL=(python3 /opt/pipeline/scripts/apks-tool.py)
-VARIANT=
 
 echo "==> [20] Staging vendor/microg"
 

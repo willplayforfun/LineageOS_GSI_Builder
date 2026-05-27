@@ -15,7 +15,6 @@ SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SIGNING="${SKIP_SIGNING:-0}"
 CLEAN="${CLEAN:-0}"
 NPROC="${NPROC:-$(nproc)}"
-VARIANT="${VARIANT:-64VN}"
 
 # ─── CLI flags (override env vars) ───────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -25,10 +24,9 @@ while [[ $# -gt 0 ]]; do
         --skip-signing) SKIP_SIGNING=1 ;;
         --clean)        CLEAN=1 ;;
         --nproc=*)      NPROC="${1#--nproc=}" ;;
-        --variant=*)    VARIANT="${1#--variant=}" ;;
         *)
             echo "ERROR: Unknown argument: $1" >&2
-            echo "Usage: $0 [--skip-sync] [--skip-build] [--skip-signing] [--clean] [--nproc=N] [--variant=VARIANT]" >&2
+            echo "Usage: $0 [--skip-sync] [--skip-build] [--skip-signing] [--clean] [--nproc=N]" >&2
             echo ""
             echo "Environment variables (can be set in addition to or instead of flags):"
             echo "  SKIP_SYNC=1     Local-only repo sync (no network; faster iteration after first sync)"
@@ -37,7 +35,6 @@ while [[ $# -gt 0 ]]; do
             echo "                  images from an existing signed zip in intermediate/"
             echo "  CLEAN=1         Wipe out/ and intermediate/ before starting"
             echo "  NPROC=N         Override parallelism (default: all cores)"
-            echo "  VARIANT=64VN    Build variant (default: arm64, vanilla, no su)"
             exit 1
             ;;
     esac
@@ -81,7 +78,7 @@ fi
 
 # ─── Run container ───────────────────────────────────────────────────────────
 echo "==> Starting build container ..."
-echo "    NPROC=${NPROC}  SKIP_SYNC=${SKIP_SYNC}  SKIP_BUILD=${SKIP_BUILD}  SKIP_SIGNING=${SKIP_SIGNING}  VARIANT=${VARIANT}"
+echo "    NPROC=${NPROC}  SKIP_SYNC=${SKIP_SYNC}  SKIP_BUILD=${SKIP_BUILD}  SKIP_SIGNING=${SKIP_SIGNING}"
 
 # Use -it when stdin is a terminal, -i only when piped/redirected (e.g. CI).
 docker_flags=(--rm)
@@ -102,5 +99,4 @@ docker run "${docker_flags[@]}" \
     -e "SKIP_SYNC=${SKIP_SYNC}" \
     -e "SKIP_BUILD=${SKIP_BUILD}" \
     -e "SKIP_SIGNING=${SKIP_SIGNING}" \
-    -e "VARIANT=${VARIANT}" \
     "${IMAGE}"

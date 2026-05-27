@@ -14,11 +14,8 @@ export NPROC
 SKIP_SYNC="${SKIP_SYNC:-0}"
 export SKIP_SYNC
 
-VARIANT="${VARIANT:-64VN}"
-export VARIANT
-
 echo "==> Pipeline starting as $(whoami) (uid=$(id -u), gid=$(id -g))"
-echo "    NPROC=${NPROC}  SKIP_SYNC=${SKIP_SYNC}  VARIANT=${VARIANT}"
+echo "    NPROC=${NPROC}  SKIP_SYNC=${SKIP_SYNC}"
 
 # Record the build start time so 99-report.sh can compute total duration.
 mkdir -p /srv/intermediate

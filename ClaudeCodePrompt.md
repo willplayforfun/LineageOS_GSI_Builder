@@ -36,7 +36,6 @@ Responsibilities:
    - `NPROC` (default: `$(nproc)`)
    - `SKIP_SYNC=1` to use local-only `repo sync` (`repo sync -l`, no network) — still resets working trees to manifest revision, which is essential for re-runnable patch application. A true "no sync at all" mode would leave projects post-patch and break step 50's idempotency.
    - `CLEAN=1` to wipe the `out/` and `intermediate/` dirs before running
-   - `VARIANT` (default: `64VN` — keep it parameterised in case the user later wants `64GN` etc.)
 
 ## `docker/entrypoint.sh`
 
